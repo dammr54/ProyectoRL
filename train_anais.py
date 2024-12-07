@@ -254,16 +254,11 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
     # Penalización por distancia al objetivo
-    # reward = -distance_to_target*100
-    reward = -distance_to_target
-    if distance_to_target < tolerance:
-        reward += 1.0
-    reward /= 10  # Escalado
-
+    reward = -distance_to_target*100
 
     # Bonificación por éxito si está dentro de la tolerancia
-    # if distance_to_target < tolerance:
-    #     reward += 100.0  # Bonificación fija por alcanzar el objetivo
+    if distance_to_target < tolerance:
+        reward += 100.0  # Bonificación fija por alcanzar el objetivo
 
     # Penalización opcional por desalineación de orientación
     if target_orientation is not None:
