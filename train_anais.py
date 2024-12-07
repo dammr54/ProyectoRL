@@ -296,7 +296,11 @@ for episode in range(num_episodes):
 
     for step in range(max_steps):
         # Selecciona una acción
+        # action = sac.select_action(state, goal)
         action = sac.select_action(state, goal)
+        if episode < 10:  # Agregar ruido durante los primeros episodios
+            action += np.random.normal(0, 0.1, size=action.shape)
+
 
         # Aplica la acción y avanza la simulación
         apply_action(data, action)
