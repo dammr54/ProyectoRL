@@ -88,7 +88,8 @@ class HERReplayBuffer:
 
         for state, action, reward, next_state, done, goal in samples:
             # Meta alternativa: usa el estado final como la nueva meta
-            her_goals = [next_state[:3] for _ in range(self.her_k)]  # Usa 3D posición del brazo como nueva meta
+            # her_goals = [next_state[:3] for _ in range(self.her_k)]  # Usa 3D posición del brazo como nueva meta
+            her_goals = [np.random.uniform(low=-1, high=1, size=3) for _ in range(self.her_k)]
             for new_goal in her_goals:
                 # Calcula nueva recompensa con la meta redefinida
                 new_reward = -np.linalg.norm(next_state[:3] - new_goal)  # Penalización por distancia
