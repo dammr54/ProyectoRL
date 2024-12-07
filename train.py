@@ -224,7 +224,7 @@ def apply_action(data, action):
     data.ctrl[:] = scaled_action
 
 
-def calculate_reward(data, target_position, target_orientation=None, tolerance=0.09):
+def calculate_reward(data, target_position, target_orientation=None, tolerance=0.1):
     """
     Calcula la recompensa para el brazo robótico basado en la distancia al objetivo,
     orientación deseada y esfuerzo aplicado.
@@ -247,11 +247,11 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
     # Penalización por distancia al objetivo
-    reward = -distance_to_target
+    reward = -distance_to_target*100
 
     # Bonificación por éxito si está dentro de la tolerancia
     if distance_to_target < tolerance:
-        reward += 15.0  # Bonificación fija por alcanzar el objetivo
+        reward += 100.0  # Bonificación fija por alcanzar el objetivo
 
     # Penalización opcional por desalineación de orientación
     if target_orientation is not None:
@@ -262,8 +262,8 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
         reward -= 0.1 * orientation_diff  # Penalización leve por desalineación
 
     # Penalización por esfuerzo aplicado
-    control_effort = np.sum(np.square(data.ctrl))  # Esfuerzo total en los actuadores
-    reward -= 0.01 * control_effort
+    #control_effort = np.sum(np.square(data.ctrl))  # Esfuerzo total en los actuadores
+    #reward -= 0.01 * control_effort
 
     return reward
 
@@ -284,9 +284,9 @@ max_action = 1.0  # Acciones normalizadas [-1, 1]
 
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
-num_episodes = 100
-max_steps = 1000  # Máximo de pasos por episodio
-goal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
+num_episodes = 120
+max_steps = 100  # Máximo de pasos por episodio
+goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)  # Reinicia la simulación
@@ -323,7 +323,7 @@ for episode in range(num_episodes):
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
 
     # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 50 == 0:
+    if (episode + 1) % 30 == 0:
         torch.save({
         "actor": sac.actor.state_dict(),
         "critic1": sac.critic1.state_dict(),
