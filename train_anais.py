@@ -89,7 +89,7 @@ class HERReplayBuffer:
 
 # SAC Algorithm
 class SAC:
-    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.95, tau=0.005, alpha=0.1):
+    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=1e-4, gamma=0.98, tau=0.005, alpha=0.1):
         self.actor = Actor(state_dim, goal_dim, action_dim).to(device)
         self.critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
@@ -198,14 +198,14 @@ max_action = 1.0
 
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
-num_episodes = 1000
-max_steps = 1000
+num_episodes = 120
+max_steps = 100
 goal = np.array([-0.7, 0, 0.5])
 
 rewards_history = []
 distance_to_goal_history = []
 losses_history = []
-batch_size = 64
+batch_size = 128
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
