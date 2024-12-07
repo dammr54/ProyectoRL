@@ -10,6 +10,8 @@ import OpenGL.GL as gl # API estándar ampliamente utilizada para el desarrollo 
 # control básico y avanzado del pipeline gráfico, permitiéndote construir gráficos interactivos y de alto rendimiento
 import time
 import numpy as np # manejo de la data
+import gym
+from gym import spaces
 
 # ---------------- Definición del modelo --------------------------
 #xml_path = "franka_fr3/scene.xml"  # Ruta archivo XML con el modelo sin grippers
@@ -23,6 +25,12 @@ opt = mujoco.MjvOption()  # personalizar renderizacion
 
 #print(dir(data))
 #help(data)
+#data.ctrl[:] = [0, 0., 0., 0., 0., 0., 0., 1000.,]
+#print(model.actuator_ctrlrange)
+#data.qpos[6] = 2
+print(data.qpos)
+
+#print(data.ctrl[:])
 
 # Configuración inicial de la cámara -> punto a enfocar
 cam.azimuth = 90 # rotacion
@@ -150,7 +158,7 @@ def main():
         #print('Posición (qpos):', data.qpos[:3])
         #print('Velocidad (qvel):', data.qvel[:3])
 
-        # Obtener el tamaño del framebuffer
+        # Obtener el tamaño del framebuffer -> renderizacion
         viewport_width, viewport_height = glfw.get_framebuffer_size(window)
         viewport = mujoco.MjrRect(0, 0, viewport_width, viewport_height)
 
@@ -159,7 +167,7 @@ def main():
                                mujoco.mjtCatBit.mjCAT_ALL.value, scene)
         mujoco.mjr_render(viewport, scene, context)
 
-        # Intercambiar los buffers (front y back)
+        # Intercambiar los buffers (front y back) -> donde se renderizó la escena con lo que actualmente está visible en la ventana
         glfw.swap_buffers(window)
 
     glfw.terminate()

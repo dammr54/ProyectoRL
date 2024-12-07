@@ -1,5 +1,6 @@
 <mujoco model="panda scene">
   <include file="panda.xml"/>
+  <include file="box.xml"/> <!-- Referencia al archivo de la caja -->
 
   <statistic center="0.3 0 0.4" extent="1"/>
 
@@ -21,3 +22,4 @@
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
   </worldbody>
 </mujoco>
+
