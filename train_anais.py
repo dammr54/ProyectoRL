@@ -138,7 +138,7 @@ class SAC:
         self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=lr)
 
         # Replay Buffer con HER
-        self.replay_buffer = HERReplayBuffer(max_size=1_000_000)
+        self.replay_buffer = HERReplayBuffer(max_size=500000)
 
         # Hiperparámetros
         self.gamma = gamma
@@ -285,7 +285,7 @@ max_action = 1.0  # Acciones normalizadas [-1, 1]
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 120
-max_steps = 100  # Máximo de pasos por episodio
+max_steps = 150  # Máximo de pasos por episodio
 goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 
 for episode in range(num_episodes):
