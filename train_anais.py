@@ -196,8 +196,8 @@ max_action = 1.0
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 120
-max_steps = 100  
-goal = np.array([-0.7, 0, 0.5])
+max_steps = 100  # Máximo de pasos por episodio
+goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 
 rewards_history = []
 distance_to_goal_history = []
@@ -240,6 +240,42 @@ for episode in range(num_episodes):
         if done:
             break
 
-    if done:
-        break
+    # Guardar métricas del episodio
+    rewards_history.append(episode_reward)
+    distance_to_goal_history.append(np.mean(episode_distances))
+    losses_history.append(np.mean(actor_losses) if actor_losses else None)
+
+    # Imprimir información relevante cada episodio
+    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}, Distancia Promedio al Objetivo: {np.mean(episode_distances):.4f}")
+
+    # Guardar el modelo periódicamente
+    if (episode + 1) % 30 == 0:
+        torch.save({
+            "actor": sac.actor.state_dict(),
+            "critic1": sac.critic1.state_dict(),
+            "critic2": sac.critic2.state_dict(),
+            "actor_optimizer": sac.actor_optimizer.state_dict(),
+            "critic1_optimizer": sac.critic1_optimizer.state_dict(),
+            "critic2_optimizer": sac.critic2_optimizer.state_dict(),
+        }, f"sac_checkpoint_{episode + 1}.pth")
+
+# Visualizar métricas al final del entrenamiento
+plt.figure(figsize=(12, 6))
+
+plt.subplot(1, 2, 1)
+plt.plot(rewards_history, label="Recompensa Total")
+plt.title("Recompensa Total por Episodio")
+plt.xlabel("Episodios")
+plt.ylabel("Recompensa")
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(distance_to_goal_history, label="Distancia Promedio al Objetivo")
+plt.title("Distancia al Objetivo por Episodio")
+plt.xlabel("Episodios")
+plt.ylabel("Distancia")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
 
