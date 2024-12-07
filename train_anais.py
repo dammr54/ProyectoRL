@@ -198,8 +198,8 @@ max_action = 1.0
 
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
-num_episodes = 120
-max_steps = 100
+num_episodes = 1000
+max_steps = 1000
 goal = np.array([-0.7, 0, 0.5])
 
 rewards_history = []
