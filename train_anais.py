@@ -6,6 +6,7 @@ import random
 import gym
 import mujoco
 import numpy as np
+import matplotlib.pyplot as plt
 
 #print(torch.__version__)
 #print(torch.cuda.is_available())
@@ -302,6 +303,7 @@ goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 rewards_history = []
 distance_to_goal_history = []
 losses_history = []
+batch_size = 64
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
