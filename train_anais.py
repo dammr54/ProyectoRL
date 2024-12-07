@@ -205,7 +205,7 @@ goal = np.array([-0.7, 0, 0.5])
 rewards_history = []
 distance_to_goal_history = []
 losses_history = []
-batch_size = 128
+batch_size = 64
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
