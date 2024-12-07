@@ -108,7 +108,7 @@ class HERReplayBuffer:
 
 # SAC Algorithm
 class SAC:
-    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2):
+    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.95, tau=0.005, alpha=0.1):
         """
         Inicializa el modelo SAC con HER.
 
