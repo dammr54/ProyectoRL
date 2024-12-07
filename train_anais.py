@@ -8,9 +8,10 @@ import mujoco
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Configuración del dispositivo
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define Actor Network
+# Definición de la Red de Actor
 class Actor(nn.Module):
     def __init__(self, state_dim, goal_dim, action_dim):
         super(Actor, self).__init__()
@@ -26,9 +27,9 @@ class Actor(nn.Module):
             goal = torch.tensor(goal, dtype=torch.float32).to(next(self.parameters()).device)
 
         if state.dim() == 1:
-            state = state.unsqueeze(0)
+            state = state.unsqueeze(0)  
         if goal.dim() == 1:
-            goal = goal.unsqueeze(0)
+            goal = goal.unsqueeze(0)  
 
         x = torch.cat([state, goal], dim=1)
         x = torch.relu(self.fc1(x))
@@ -41,12 +42,12 @@ class Actor(nn.Module):
     def sample(self, state, goal):
         mean, std = self.forward(state, goal)
         normal = torch.distributions.Normal(mean, std)
-        z = normal.rsample()
+        z = normal.rsample()  # Reparameterization trick
         action = torch.tanh(z)
-        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + 1e-6)
+        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + 1e-6)  
         return action, log_prob.sum(1, keepdim=True)
 
-# Define Critic Network
+# Definición de la Red de Crítica
 class Critic(nn.Module):
     def __init__(self, state_dim, goal_dim, action_dim):
         super(Critic, self).__init__()
@@ -60,7 +61,7 @@ class Critic(nn.Module):
         x = torch.relu(self.fc2(x))
         return self.fc3(x)
 
-# replay buffer her
+# Replay buffer con soporte para Hindsight Experience Replay
 class HERReplayBuffer:
     def __init__(self, max_size, her_k=4):
         self.buffer = deque(maxlen=max_size)
@@ -72,11 +73,13 @@ class HERReplayBuffer:
     def sample(self, batch_size):
         samples = random.sample(self.buffer, batch_size)
         augmented_samples = []
+
         for state, action, reward, next_state, done, goal in samples:
             her_goals = [np.random.uniform(low=-1, high=1, size=3) for _ in range(self.her_k)]
             for new_goal in her_goals:
                 new_reward = -np.linalg.norm(next_state[:3] - new_goal)
                 augmented_samples.append((state, action, new_reward, next_state, done, new_goal))
+
         augmented_samples.extend(samples)
         states, actions, rewards, next_states, dones, goals = zip(*augmented_samples)
         return (torch.tensor(states, dtype=torch.float32),
@@ -87,9 +90,9 @@ class HERReplayBuffer:
                 torch.tensor(goals, dtype=torch.float32))
 
 
-# SAC Algorithm
+# SAC con soporte para HER
 class SAC:
-    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=1e-4, gamma=0.98, tau=0.005, alpha=0.1):
+    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.95, tau=0.005, alpha=0.1):
         self.actor = Actor(state_dim, goal_dim, action_dim).to(device)
         self.critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
@@ -172,20 +175,14 @@ def apply_action(data, action):
     scaled_action = ctrl_min + (action + 1) * 0.5 * (ctrl_max - ctrl_min)
     data.ctrl[:] = scaled_action
 
-
-def calculate_reward(data, target_position, target_orientation=None, tolerance=0.1):
+def calculate_reward(data, target_position, tolerance=0.1):
     end_effector_id = 6
     end_effector_position = data.xpos[end_effector_id]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-    reward = -distance_to_target * 100
+    reward = -distance_to_target*100
     if distance_to_target < tolerance:
         reward += 100.0
-    if target_orientation is not None:
-        current_orientation = data.xquat[end_effector_id]
-        orientation_diff = np.linalg.norm(current_orientation - target_orientation)
-        reward -= 0.1 * orientation_diff
     return reward
-
 
 xml_path = "franka_emika_panda/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
@@ -199,7 +196,7 @@ max_action = 1.0
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 120
-max_steps = 100
+max_steps = 100  
 goal = np.array([-0.7, 0, 0.5])
 
 rewards_history = []
@@ -215,28 +212,34 @@ for episode in range(num_episodes):
     actor_losses = []
 
     for step in range(max_steps):
+        # Seleccionar acción
         action = sac.select_action(state, goal)
+        if episode < 10:  # Exploración inicial
+            action += np.random.normal(0, 0.1, size=action.shape)
+
+        # Aplicar acción y avanzar simulación
         apply_action(data, action)
         step_simulation(model, data)
 
+        # Obtener nuevo estado, recompensa, distancia, y verificar si termina
         next_state = get_state(data)
         reward = calculate_reward(data, goal)
-        done = False  # Assuming episode continues until max_steps
+        distance_to_goal = np.linalg.norm(data.xpos[6] - goal)
+        done = step == max_steps - 1  # Marca fin de episodio si se alcanzan los pasos máximos
 
+        # Guardar métricas de distancia
+        episode_distances.append(distance_to_goal)
+
+        # Agregar al buffer de replay
         sac.add_to_buffer((state, action, reward, next_state, done, goal))
+
+        # Actualizar estado y recompensa acumulada
         state = next_state
         episode_reward += reward
-        episode_distances.append(np.linalg.norm(data.xpos[6] - goal))
 
-        if done or step == max_steps - 1:
+        if done:
             break
 
-    sac.train(batch_size)
+    if done:
+        break
 
-    # Printing each episode's details
-    print(f"Episode {episode + 1}:")
-    print(f"  Total Reward: {episode_reward:.2f}")
-    print(f"  Average Distance to Goal: {np.mean(episode_distances):.2f}")
-
-    rewards_history.append(episode_reward)
-    distance_to_goal_history.append(np.mean(episode_distances))
