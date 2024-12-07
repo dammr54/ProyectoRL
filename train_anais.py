@@ -248,7 +248,12 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
     # Penalización por distancia al objetivo
-    reward = -distance_to_target*100
+    # reward = -distance_to_target*100
+    reward = -distance_to_target
+    if distance_to_target < tolerance:
+        reward += 1.0
+    reward /= 10  # Escalado
+
 
     # Bonificación por éxito si está dentro de la tolerancia
     if distance_to_target < tolerance:
