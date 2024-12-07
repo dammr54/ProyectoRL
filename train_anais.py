@@ -299,51 +299,85 @@ num_episodes = 120
 max_steps = 100  # Máximo de pasos por episodio
 goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 
+rewards_history = []
+distance_to_goal_history = []
+losses_history = []
+
 for episode in range(num_episodes):
-    mujoco.mj_resetData(model, data)  # Reinicia la simulación
+    mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
+    episode_distances = []
+    actor_losses = []
 
     for step in range(max_steps):
-        # Selecciona una acción
-        # action = sac.select_action(state, goal)
+        # Seleccionar acción
         action = sac.select_action(state, goal)
-        if episode < 10:  # Agregar ruido durante los primeros episodios
+        if episode < 10:  # Exploración inicial
             action += np.random.normal(0, 0.1, size=action.shape)
 
-
-        # Aplica la acción y avanza la simulación
+        # Aplicar acción y avanzar simulación
         apply_action(data, action)
         step_simulation(model, data)
 
-        # Extrae el nuevo estado, recompensa, y chequea si el episodio termina
+        # Obtener nuevo estado, recompensa, distancia, y verificar si termina
         next_state = get_state(data)
         reward = calculate_reward(data, goal)
-        done = step == max_steps - 1  # Termina después de un número fijo de pasos
+        distance_to_goal = np.linalg.norm(data.xpos[6] - goal)
+        done = step == max_steps - 1
 
-        # Agrega la transición al buffer
+        # Guardar métricas de distancia
+        episode_distances.append(distance_to_goal)
+
+        # Agregar al buffer de replay
         sac.add_to_buffer((state, action, reward, next_state, done, goal))
 
-        # Actualiza el estado
+        # Actualizar estado y recompensa acumulada
         state = next_state
         episode_reward += reward
 
-        # Entrena el modelo si hay suficientes datos
-        if len(sac.replay_buffer.buffer) > 256:
-            sac.train(batch_size=256)
+        # Entrenar si hay suficientes datos
+        if len(sac.replay_buffer.buffer) > batch_size:
+            sac.train(batch_size=batch_size)
+            actor_losses.append(sac.actor_optimizer.param_groups[0]["lr"])  # Registrar pérdida de actor
 
         if done:
             break
 
-    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
+    # Guardar métricas del episodio
+    rewards_history.append(episode_reward)
+    distance_to_goal_history.append(np.mean(episode_distances))
+    losses_history.append(np.mean(actor_losses) if actor_losses else None)
 
-    # Guarda el modelo cada 50 episodios
+    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}, Distancia Promedio al Objetivo: {np.mean(episode_distances):.4f}")
+
+    # Guardar el modelo periódicamente
     if (episode + 1) % 30 == 0:
         torch.save({
-        "actor": sac.actor.state_dict(),
-        "critic1": sac.critic1.state_dict(),
-        "critic2": sac.critic2.state_dict(),
-        "actor_optimizer": sac.actor_optimizer.state_dict(),
-        "critic1_optimizer": sac.critic1_optimizer.state_dict(),
-        "critic2_optimizer": sac.critic2_optimizer.state_dict(),
-    }, f"sac_checkpoint_{episode + 1}.pth")
+            "actor": sac.actor.state_dict(),
+            "critic1": sac.critic1.state_dict(),
+            "critic2": sac.critic2.state_dict(),
+            "actor_optimizer": sac.actor_optimizer.state_dict(),
+            "critic1_optimizer": sac.critic1_optimizer.state_dict(),
+            "critic2_optimizer": sac.critic2_optimizer.state_dict(),
+        }, f"sac_checkpoint_{episode + 1}.pth")
+
+# Visualizar métricas al final del entrenamiento
+plt.figure(figsize=(12, 6))
+
+plt.subplot(1, 2, 1)
+plt.plot(rewards_history, label="Recompensa Total")
+plt.title("Recompensa Total por Episodio")
+plt.xlabel("Episodios")
+plt.ylabel("Recompensa")
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(distance_to_goal_history, label="Distancia Promedio al Objetivo")
+plt.title("Distancia al Objetivo por Episodio")
+plt.xlabel("Episodios")
+plt.ylabel("Distancia")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
