@@ -138,7 +138,7 @@ class SAC:
         self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=lr)
 
         # Replay Buffer con HER
-        self.replay_buffer = HERReplayBuffer(max_size=500000)
+        self.replay_buffer = HERReplayBuffer(max_size=1500000)
 
         # Hiperparámetros
         self.gamma = gamma
