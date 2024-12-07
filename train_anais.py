@@ -256,8 +256,8 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
 
 
     # Bonificación por éxito si está dentro de la tolerancia
-    if distance_to_target < tolerance:
-        reward += 100.0  # Bonificación fija por alcanzar el objetivo
+    # if distance_to_target < tolerance:
+    #     reward += 100.0  # Bonificación fija por alcanzar el objetivo
 
     # Penalización opcional por desalineación de orientación
     if target_orientation is not None:
