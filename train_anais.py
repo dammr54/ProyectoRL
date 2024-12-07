@@ -19,11 +19,12 @@ class Actor(nn.Module):
         # self.fc1 = nn.Linear(state_dim + goal_dim, 256)
         # self.fc2 = nn.Linear(256, 256)
         # self.fc3 = nn.Linear(256, action_dim)
+        # self.log_std = nn.Linear(256, action_dim)
 
         self.fc1 = nn.Linear(state_dim + goal_dim, 512)
         self.fc2 = nn.Linear(512, 512)
         self.fc3 = nn.Linear(512, action_dim)
-        self.log_std = nn.Linear(256, action_dim)
+        self.log_std = nn.Linear(512, action_dim)
 
     def forward(self, state, goal):
         # Convertir a tensores si no lo son
