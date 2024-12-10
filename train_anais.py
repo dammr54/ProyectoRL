@@ -173,18 +173,15 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, all_rewards, tolerance=0.1):
+def calculate_reward(data, target_position, all_rewards, tolerance):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
-    max_reward = max(all_rewards) if len(all_rewards) > 0 else tolerance
-    tolerance = (-1) * max_reward
-    print(f"tolerance: {tolerance}")
-    print(f"distance to target: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += distance_to_target
+        tolerance -= 0.1
         print("omg un reward")
-    return reward
+    return reward, tolerance
 
 xml_path = "franka_emika_panda/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
@@ -206,6 +203,7 @@ for episode in range(num_episodes):
     state = get_state(data)
     episode_reward = 0
     all_rewards = []
+    tolerance = 1
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
@@ -217,7 +215,7 @@ for episode in range(num_episodes):
 
         # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
-        reward = calculate_reward(data, goal, all_rewards)
+        reward, tolerance = calculate_reward(data, goal, all_rewards, tolerance)
         all_rewards.append(reward)
         done = step == max_steps - 1
 
