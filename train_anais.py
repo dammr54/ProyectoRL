@@ -197,10 +197,19 @@ for episode in range(num_episodes):
     for step in range(max_steps):
         action = sac.select_action(state, goal)
         apply_action = np.clip(action, -1, 1)  # Escalar acción
-        sac.add_to_buffer((state, apply_action, reward, next_state, done, goal))
+
+        # Aplica la acción al entorno y avanza la simulación
+        data.ctrl[:] = apply_action
+        mujoco.mj_step(model, data)
+
+        # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
         reward = calculate_reward(data, goal)
         done = step == max_steps - 1
+
+        # Agrega la transición al buffer de experiencia
+        sac.add_to_buffer((state, apply_action, reward, next_state, done, goal))
+
         # Actualiza el estado actual y acumula la recompensa
         state = next_state
         episode_reward += reward
