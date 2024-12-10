@@ -244,6 +244,8 @@ for episode in range(num_episodes):
     min_distance = min(all_distances)
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
     print(f"Distancia más cercana: {min_distance}")
+    print(f"Promedio distancias: {np.mean(all_distances)}")
+    print(f"Mediana distancia: {np.median(all_distances)}")
     print(f"Tolerancia final: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
