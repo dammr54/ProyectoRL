@@ -154,7 +154,7 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.8):
+def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
     # Posición del efector final
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
@@ -210,7 +210,7 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 100
 max_steps = 500
 goal = np.array([0.5, 0.5, 0.5])
-tolerance = 0.8
+tolerance = 0.6
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
