@@ -176,19 +176,23 @@ def get_state(data):
 def calculate_reward(data, target_position, all_rewards, tolerance, tope_tolerance=0.05):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-    reward = -distance_to_target * 1
+    # reward = -distance_to_target * 1
     # print(f"old tolerance: {tolerance}")
     # print(f"distance: {distance_to_target}")
-    if distance_to_target < tolerance:
-        reward += distance_to_target
-        dif_tolerance_distance = tolerance - distance_to_target
-        if tolerance - dif_tolerance_distance >= tope_tolerance:
-            tolerance -= dif_tolerance_distance
-        else:
-            tolerance = tope_tolerance
+    # if distance_to_target < tolerance:
+    #     reward += distance_to_target
+    #     dif_tolerance_distance = tolerance - distance_to_target
+    #     if tolerance - dif_tolerance_distance >= tope_tolerance:
+    #         tolerance -= dif_tolerance_distance
+    #     else:
+    #         tolerance = tope_tolerance
         # tolerance -= (tolerance - distance_to_target)
         # print(f"new tolerance: {tolerance}")
         # print("omg un reward")
+    if distance_to_target < tolerance:
+        reward = distance_to_target
+    else:
+        reward = -distance_to_target
     return reward, tolerance
 
 xml_path = "franka_emika_panda/scene.xml"
@@ -244,7 +248,7 @@ for episode in range(num_episodes):
 
     # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-    print(f"Tolerance actual: {tolerance}")
+    # print(f"Tolerance actual: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
     if (episode + 1) % 50 == 0:
