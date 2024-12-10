@@ -6,7 +6,9 @@ import random
 import numpy as np
 import mujoco
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device_ = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"device: {device_}")
+device = torch.device(device_)
 
 # ---------------- Definición de Redes ------------------------
 class Actor(nn.Module):
@@ -177,6 +179,7 @@ def calculate_reward(data, target_position, tolerance=0.05):
     reward = -distance_to_target * 10
     if distance_to_target < tolerance:
         reward += 10.0
+        print("omg un reward")
     return reward
 
 xml_path = "franka_emika_panda/scene.xml"
