@@ -100,10 +100,12 @@ class SAC:
         self.tau = tau
         self.max_action = max_action
 
+        # Si alpha es "auto", inicializamos log_alpha para aprenderlo
         if alpha == "auto":
             self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
             self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
-            self.target_entropy = -action_dim
+            self.target_entropy = -action_dim  # Entropía objetivo para el espacio de acciones
+            self.alpha = self.log_alpha.exp()
         else:
             self.alpha = alpha
 
@@ -147,6 +149,7 @@ class SAC:
         actor_loss.backward()
         self.actor_optimizer.step()
 
+        # Actualizamos el valor de alpha solo si está en "auto"
         if hasattr(self, "log_alpha"):
             alpha_loss = -(self.log_alpha * (log_probs + self.target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
@@ -154,6 +157,7 @@ class SAC:
             self.alpha_optimizer.step()
             self.alpha = self.log_alpha.exp()
 
+        # Actualización de las redes objetivo (target networks)
         for param, target_param in zip(self.critic1.parameters(), self.target_critic1.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
         for param, target_param in zip(self.critic2.parameters(), self.target_critic2.parameters()):
@@ -161,6 +165,7 @@ class SAC:
 
     def add_to_buffer(self, transition):
         self.replay_buffer.add(transition)
+
 
 # ---------------- Entrenamiento del Agente ----------------
 def get_state(data):
