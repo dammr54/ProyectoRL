@@ -5,6 +5,7 @@ from collections import deque
 import random
 import numpy as np
 import mujoco
+import funciones_pickle as fpickle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
@@ -161,11 +162,11 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
 
     # Premiar el acercamiento al objetivo
     if distance_to_target <= tolerance:
-        reward = distance_to_target * 1e-5  # Premia el acercamiento con una recompensa positiva
+        reward = distance_to_target * 1e-4  # Premia el acercamiento con una recompensa positiva
         if distance_to_target < tope_tolerance:
-            reward += 1  # Bonificación si el agente está muy cerca del objetivo
+            reward += 10  # Bonificación si el agente está muy cerca del objetivo
     else:
-        reward = -distance_to_target * 1e-6
+        reward = -distance_to_target * 1e-4
 
     # Penalización por esfuerzo (torque de los actuadores)
     torque_effort = np.sum(np.abs(data.ctrl))  # Control de los actuadores
@@ -214,6 +215,12 @@ num_episodes = 100
 max_steps = 500
 goal = np.array([0.5, 0.5, 0.5])
 tolerance = 1
+mean_d = []
+median_d = []
+min_d = []
+tolerance_final = []
+all_rewards = []
+
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
@@ -223,13 +230,17 @@ for episode in range(num_episodes):
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
-        apply_action = np.clip(action, -1, 1)
+        
+        # Agregar ruido a las acciones para fomentar más exploración
+        noise_scale = 0.1  # Controla el nivel de ruido
+        noisy_action = action + noise_scale * np.random.randn(*action.shape)
+        apply_action = np.clip(noisy_action, -1, 1)  # Limitar la acción dentro de los límites
+
         data.ctrl[:] = apply_action
         mujoco.mj_step(model, data)
 
         next_state = get_state(data)
-        reward, tolerance, distance_to_target = calculate_reward(data, goal,
-        tolerance)
+        reward, tolerance, distance_to_target = calculate_reward(data, goal, tolerance)
         all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
@@ -246,13 +257,18 @@ for episode in range(num_episodes):
 
     min_distance = min(all_distances)
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-    print(f"    Distancia más cercana: {min_distance}")
-    print(f"    Promedio distancias: {np.mean(all_distances)}")
-    print(f"    Mediana distancia: {np.median(all_distances)}")
-    print(f"    Tolerancia final: {tolerance}")
+    all_rewards.append(episode_reward)
+    print(f"    Distancia más cercana: {min_distance:.2f}")
+    min_d.append(min_distance)
+    print(f"    Promedio distancias: {np.mean(all_distances):.2f}")
+    mean_d.append(np.mean(all_distances))
+    print(f"    Mediana distancia: {np.median(all_distances):.2f}")
+    median_d.append(np.median(all_distances))
+    print(f"    Tolerancia final: {tolerance:.2f}")
+    tolerance_final.append(tolerance)
 
     # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 10 == 0:
+    if (episode + 1) % 5 == 0:
         torch.save({
             "actor": sac.actor.state_dict(),
             "critic1": sac.critic1.state_dict(),
@@ -261,3 +277,9 @@ for episode in range(num_episodes):
             "critic1_optimizer": sac.critic1_optimizer.state_dict(),
             "critic2_optimizer": sac.critic2_optimizer.state_dict(),
         }, f"sac_checkpoint_{episode + 1}.pth")
+        fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
+        fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
+        fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
+        fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
+        fpickle.dump(f"listas_resultados/tolerances_{episode + 1}.pickle", tolerance_final)
+
