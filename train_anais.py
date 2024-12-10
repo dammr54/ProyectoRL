@@ -6,6 +6,7 @@ import random
 import numpy as np
 import mujoco
 import funciones_pickle as fpickle
+from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
@@ -220,7 +221,7 @@ tolerance_final = []
 all_rewards = []
 
 
-for episode in range(num_episodes):
+for episode in tqdm(range(num_episodes)):
     mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
