@@ -204,8 +204,8 @@ max_action = 1.0
 
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
-num_episodes = 150
-max_steps = 200
+num_episodes = 100
+max_steps = 500
 goal = np.array([0.5, 0.5, 0.5])
 tolerance = 0.9
 
