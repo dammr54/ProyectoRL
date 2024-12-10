@@ -5,6 +5,7 @@ from stable_baselines3 import SAC, HerReplayBuffer
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback
+from tqdm import tqdm
 
 # ---------------- Configuración del entorno ------------------------
 class FrankaPandaEnv(gym.Env):  # Heredar de gymnasium.Env
@@ -102,7 +103,7 @@ model.learn(total_timesteps=500_000, callback=eval_callback)
 
 # ---------------- Evaluación del Modelo ----------------------------
 obs, _ = env.reset()
-for _ in range(1000):
+for _ in tqdm(range(1000)):
     action, _ = model.predict(obs, deterministic=True)
     obs, reward, done, truncated, _ = env.step(action)
     env.render()
