@@ -155,7 +155,7 @@ def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
 def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05):
-    print(f"data: {data}")
+    print(f"data: {data.xpos}")
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
