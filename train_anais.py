@@ -231,10 +231,12 @@ for episode in tqdm(range(num_episodes)):
         action = sac.select_action(state, goal)
         
         # Agregar ruido a las acciones para fomentar más exploración
-        if 0 < episode < 25:
+        if 0 < episode < 10:
             noise_scale = 0.25
+        if 0 < episode < 25:
+            noise_scale = 0.2
         elif 25 <= episode < 50:
-            noise_scale = 0.15
+            noise_scale = 0.1
         elif 50 <= episode < 75:
             noise_scale = 0.05
         else:
