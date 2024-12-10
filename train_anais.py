@@ -177,7 +177,7 @@ def calculate_reward(data, target_position, all_rewards, tolerance=0.1):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
-    max_reward = max(all_rewards)
+    max_reward = max(all_rewards) if len(all_rewards) > 0 else tolerance
     tolerance = max_reward - tolerance
     # print(f"distance to target: {distance_to_target}")
     if distance_to_target < tolerance:
