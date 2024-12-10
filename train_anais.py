@@ -177,10 +177,11 @@ def calculate_reward(data, target_position, all_rewards, tolerance, tope_toleran
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
+    print(f"old tolerance: {tolerance}")
     print(f"distance: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += distance_to_target
-        tolerance = (distance_to_target - tolerance)
+        tolerance -= (tolerance - distance_to_target)
         print(f"new tolerance: {tolerance}")
         print("omg un reward")
     return reward, tolerance
@@ -205,7 +206,7 @@ for episode in range(num_episodes):
     state = get_state(data)
     episode_reward = 0
     all_rewards = []
-    tolerance = 1
+    tolerance = 0.9
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
