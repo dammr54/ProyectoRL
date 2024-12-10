@@ -177,7 +177,7 @@ def calculate_reward(data, target_position, tolerance=0.1):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
-    print(f"distance to target: {distance_to_target}")
+    # print(f"distance to target: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += 1
         print("omg un reward")
@@ -225,6 +225,7 @@ for episode in range(num_episodes):
 
         # Entrena el modelo si hay suficientes datos en el buffer
         if len(sac.replay_buffer.buffer) > 256:
+            print(f"entrando a train")
             sac.train(batch_size=256)
 
         # Termina el episodio si está completo
