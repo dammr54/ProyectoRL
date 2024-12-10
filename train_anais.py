@@ -198,7 +198,7 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 150
 max_steps = 200
 goal = np.array([0.5, 0.5, 0.5])
-tolerance = 0.8
+tolerance = 0.5
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
@@ -239,7 +239,8 @@ for episode in range(num_episodes):
     # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
     min_distance = min(all_distances)
-    tolerance = min_distance
+    if min_distance < tolerance:
+        tolerance = min_distance
     print(f"Nueva Tolerance: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
