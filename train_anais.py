@@ -210,7 +210,7 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 100
 max_steps = 500
 goal = np.array([0.5, 0.5, 0.5])
-tolerance = 0.9
+tolerance = 0.8
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
