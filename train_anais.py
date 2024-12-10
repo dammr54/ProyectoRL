@@ -230,7 +230,8 @@ for episode in range(num_episodes):
         action = sac.select_action(state, goal)
         
         # Agregar ruido a las acciones para fomentar más exploración
-        noise_scale = 0.1  # Controla el nivel de ruido
+        noise_scale = max(0.01, 1 - (episode / num_episodes))  # Reduce el ruido gradualmente
+        noisy_action = action + noise_scale * np.random.randn(*action.shape)
         noisy_action = action + noise_scale * np.random.randn(*action.shape)
         apply_action = np.clip(noisy_action, -1, 1)  # Limitar la acción dentro de los límites
 
