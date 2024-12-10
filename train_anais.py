@@ -230,7 +230,7 @@ for episode in range(num_episodes):
         action = sac.select_action(state, goal)
         
         # Agregar ruido a las acciones para fomentar más exploración
-        noise_scale = max(0.01, 1 - (episode / num_episodes))  # Reduce el ruido gradualmente
+        noise_scale = max(0.01, 1 - ((episode / num_episodes) * 10))  # Reduce el ruido gradualmente
         noisy_action = action + noise_scale * np.random.randn(*action.shape)
         noisy_action = action + noise_scale * np.random.randn(*action.shape)
         apply_action = np.clip(noisy_action, -1, 1)  # Limitar la acción dentro de los límites
@@ -275,7 +275,7 @@ for episode in range(num_episodes):
             "actor_optimizer": sac.actor_optimizer.state_dict(),
             "critic1_optimizer": sac.critic1_optimizer.state_dict(),
             "critic2_optimizer": sac.critic2_optimizer.state_dict(),
-        }, f"sac_checkpoint_{episode + 1}.pth")
+        }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
         fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
         fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
         fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
