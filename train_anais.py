@@ -173,10 +173,12 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance=0.1):
+def calculate_reward(data, target_position, all_rewards, tolerance=0.1):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
+    max_reward = max(all_rewards)
+    tolerance = max_reward - tolerance
     # print(f"distance to target: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += 1
@@ -202,6 +204,7 @@ for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
+    all_rewards = []
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
@@ -213,7 +216,8 @@ for episode in range(num_episodes):
 
         # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
-        reward = calculate_reward(data, goal)
+        reward = calculate_reward(data, goal, all_rewards)
+        all_rewards.append(reward)
         done = step == max_steps - 1
 
         # Agrega la transición al buffer de experiencia
