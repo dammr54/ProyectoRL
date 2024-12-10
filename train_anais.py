@@ -4,6 +4,7 @@ import torch.optim as optim
 from collections import deque
 import random
 import numpy as np
+import mujoco
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
