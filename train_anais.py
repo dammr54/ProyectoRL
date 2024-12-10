@@ -161,11 +161,11 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
 
     # Premiar el acercamiento al objetivo
     if distance_to_target <= tolerance:
-        reward = 1 / (distance_to_target + 1e-6)  # Premia el acercamiento con una recompensa positiva
+        reward = distance_to_target / 1e-6  # Premia el acercamiento con una recompensa positiva
         if distance_to_target < tope_tolerance:
             reward += 10  # Bonificación si el agente está muy cerca del objetivo
     else:
-        reward = -1 / (distance_to_target + 1e-6)
+        reward = -distance_to_target / 1e-6
 
     # Penalización por esfuerzo (torque de los actuadores)
     torque_effort = np.sum(np.abs(data.ctrl))  # Control de los actuadores
@@ -246,13 +246,13 @@ for episode in range(num_episodes):
 
     min_distance = min(all_distances)
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-    print(f"Distancia más cercana: {min_distance}")
-    print(f"Promedio distancias: {np.mean(all_distances)}")
-    print(f"Mediana distancia: {np.median(all_distances)}")
-    print(f"Tolerancia final: {tolerance}")
+    print(f"    Distancia más cercana: {min_distance}")
+    print(f"    Promedio distancias: {np.mean(all_distances)}")
+    print(f"    Mediana distancia: {np.median(all_distances)}")
+    print(f"    Tolerancia final: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 50 == 0:
+    if (episode + 1) % 10 == 0:
         torch.save({
             "actor": sac.actor.state_dict(),
             "critic1": sac.critic1.state_dict(),
