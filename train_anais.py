@@ -193,7 +193,7 @@ def calculate_reward(data, target_position, all_rewards, tolerance, tope_toleran
         reward = distance_to_target
     else:
         reward = -distance_to_target
-    return reward, tolerance
+    return reward, tolerance, distance_to_target
 
 xml_path = "franka_emika_panda/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
@@ -215,7 +215,7 @@ for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
-    all_rewards = []
+    all_distances = []
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
@@ -227,8 +227,8 @@ for episode in range(num_episodes):
 
         # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
-        reward, tolerance = calculate_reward(data, goal, all_rewards, tolerance)
-        # all_rewards.append(reward)
+        reward, tolerance, distances = calculate_reward(data, goal, all_rewards, tolerance)
+        all_distances.append(distances)
         done = step == max_steps - 1
 
         # Agrega la transición al buffer de experiencia
@@ -248,7 +248,10 @@ for episode in range(num_episodes):
 
     # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-    # print(f"Tolerance actual: {tolerance}")
+    min_distance = min(all_distances)
+    tolerance -= (tolerance - min_distance)
+    print(f"Distancia más cercana: {min_distance}")
+    print(f"Nueva Tolerance: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
     if (episode + 1) % 50 == 0:
