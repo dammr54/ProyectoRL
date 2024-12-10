@@ -173,16 +173,36 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, all_rewards, tolerance, tope_tolerance=0.05):
-    end_effector_position = data.xpos[6]
+def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_penalty=-10):
+    """
+    Calcula la recompensa basada en la distancia al objetivo y ajusta la tolerancia adaptativa.
+
+    Args:
+        data: Datos de simulación de MuJoCo.
+        target_position: Posición objetivo.
+        tolerance: Tolerancia actual para considerar la proximidad como recompensa positiva.
+        tope_tolerance: Tolerancia mínima permitida.
+        max_penalty: Penalización máxima por estar lejos del objetivo.
+
+    Returns:
+        reward: Recompensa calculada.
+        new_tolerance: Nueva tolerancia adaptativa.
+        distance_to_target: Distancia actual al objetivo.
+    """
+    end_effector_position = data.xpos[6]  # Posición de la herramienta final
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-    if tolerance < 0.05:
-        tolerance = 0.05
+
     if distance_to_target < tolerance:
-        reward = distance_to_target
+        reward = 1 / (distance_to_target + 1e-6)  # Mayor recompensa para distancias pequeñas
+        if distance_to_target < tope_tolerance:
+            reward += 10  # Bonificación por alcanzar la meta
     else:
-        reward = -distance_to_target
-    return reward, tolerance, distance_to_target
+        reward = max_penalty * (distance_to_target / tolerance)  # Penalización escalada
+
+    # Ajusta la tolerancia para el próximo paso
+    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
+
+    return reward, new_tolerance, distance_to_target
 
 xml_path = "franka_emika_panda/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
@@ -206,44 +226,36 @@ for episode in range(num_episodes):
     state = get_state(data)
     episode_reward = 0
     all_distances = []
-    all_rewards = []
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
-        apply_action = np.clip(action, -1, 1)  # Escalar acción
+        apply_action = np.clip(action, -1, 1)
 
-        # Aplica la acción al entorno y avanza la simulación
         data.ctrl[:] = apply_action
         mujoco.mj_step(model, data)
 
-        # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
-        reward, tolerance, distances = calculate_reward(data, goal, all_rewards, tolerance)
-        all_distances.append(distances)
+        reward, tolerance, distance_to_target = calculate_reward(
+            data, goal, tolerance, tope_tolerance=0.05
+        )
+        all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
-        # Agrega la transición al buffer de experiencia
         sac.add_to_buffer((state, apply_action, reward, next_state, done, goal))
 
-        # Actualiza el estado actual y acumula la recompensa
         state = next_state
         episode_reward += reward
 
-        # Entrena el modelo si hay suficientes datos en el buffer
         if len(sac.replay_buffer.buffer) > 256:
             sac.train(batch_size=256)
 
-        # Termina el episodio si está completo
         if done:
             break
 
-    # Imprime la recompensa total por episodio
-    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
     min_distance = min(all_distances)
-    if min_distance < tolerance:
-        tolerance = min_distance
-    print(f"Nueva Tolerance: {tolerance}")
-    print(f"Distancia menor: {min_distance}")
+    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
+    print(f"Distancia más cercana: {min_distance}")
+    print(f"Tolerancia final: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
     if (episode + 1) % 50 == 0:
