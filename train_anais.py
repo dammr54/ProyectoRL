@@ -154,7 +154,8 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05):
+def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.8):
+    # Posición del efector final
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
@@ -181,13 +182,14 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
     reward -= 0.05 * joint_position_error  # Penaliza la desviación de las posiciones de las articulaciones
 
     # Verificar colisiones
-    # collision = np.any(data.collision)
-    # if collision:
-    #     reward -= 10  # Penaliza las colisiones fuertemente
+    collision = np.any(data.collision)
+    if collision:
+        reward -= 10  # Penaliza las colisiones fuertemente
 
     # Actualización de tolerancia
-    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
-    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)
+    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)  # Reduce la tolerancia
+    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Evita que suba demasiado
+    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a 0.8
 
     reward = np.clip(reward, -10, 10)  # Limita la recompensa para evitar valores extremos
     return reward, new_tolerance, distance_to_target
