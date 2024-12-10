@@ -231,7 +231,15 @@ for episode in tqdm(range(num_episodes)):
         action = sac.select_action(state, goal)
         
         # Agregar ruido a las acciones para fomentar más exploración
-        noise_scale = max(0.01, 1 - ((episode / num_episodes) * 10))  # Reduce el ruido gradualmente
+        if 0 < episode < 25:
+            noise_scale = 0.25
+        elif 25 <= episode < 50:
+            noise_scale = 0.15
+        elif 50 <= episode < 75:
+            noise_scale = 0.05
+        else:
+            noise_scale = 0
+        # noise_scale = max(0.01, 1 - ((episode / num_episodes) * 10))  # Reduce el ruido gradualmente
         noisy_action = action + noise_scale * np.random.randn(*action.shape)
         noisy_action = action + noise_scale * np.random.randn(*action.shape)
         apply_action = np.clip(noisy_action, -1, 1)  # Limitar la acción dentro de los límites
