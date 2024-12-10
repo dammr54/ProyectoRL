@@ -161,11 +161,11 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
 
     # Premiar el acercamiento al objetivo
     if distance_to_target <= tolerance:
-        reward = distance_to_target / 1e-6  # Premia el acercamiento con una recompensa positiva
+        reward = distance_to_target * 1e-6  # Premia el acercamiento con una recompensa positiva
         if distance_to_target < tope_tolerance:
             reward += 10  # Bonificación si el agente está muy cerca del objetivo
     else:
-        reward = -distance_to_target / 1e-6
+        reward = -distance_to_target * 1e-6
 
     # Penalización por esfuerzo (torque de los actuadores)
     torque_effort = np.sum(np.abs(data.ctrl))  # Control de los actuadores
