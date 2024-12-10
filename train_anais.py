@@ -155,16 +155,17 @@ def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
 def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05):
-    # Posición del efector final
+    print(f"data: {data}")
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
-    # Velocidad del efector final (si es relevante)
-    speed = np.linalg.norm(data.qvel[6])  # Ajusta según la estructura de tu modelo
+    # Premiar el acercamiento al objetivo
+    reward = 1 / (distance_to_target + 1e-6)  # Premia el acercamiento con una recompensa positiva
+    if distance_to_target < tope_tolerance:
+        reward += 10  # Bonificación si el agente está muy cerca del objetivo
 
     # Penalización por esfuerzo (torque de los actuadores)
     torque_effort = np.sum(np.abs(data.ctrl))  # Control de los actuadores
-    reward = -distance_to_target + (0.1 * speed)  # Recompensa por movimiento rápido pero eficiente
     reward -= 0.01 * torque_effort  # Penaliza el esfuerzo excesivo
 
     # Penalización por desviación de orientación (si se requiere)
@@ -185,12 +186,13 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
     # if collision:
     #     reward -= 10  # Penaliza las colisiones fuertemente
 
-    # Actualizar tolerancia
+    # Actualización de tolerancia
     new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
     new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)
 
     reward = np.clip(reward, -10, 10)  # Limita la recompensa para evitar valores extremos
     return reward, new_tolerance, distance_to_target
+
 
 
 xml_path = "franka_emika_panda/scene.xml"
