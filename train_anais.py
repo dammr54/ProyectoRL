@@ -177,13 +177,13 @@ def calculate_reward(data, target_position, all_rewards, tolerance, tope_toleran
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
-    print(f"old tolerance: {tolerance}")
-    print(f"distance: {distance_to_target}")
+    # print(f"old tolerance: {tolerance}")
+    # print(f"distance: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += distance_to_target
         tolerance -= (tolerance - distance_to_target)
-        print(f"new tolerance: {tolerance}")
-        print("omg un reward")
+        # print(f"new tolerance: {tolerance}")
+        # print("omg un reward")
     return reward, tolerance
 
 xml_path = "franka_emika_panda/scene.xml"
