@@ -52,7 +52,7 @@ class Critic(nn.Module):
 
 # ---------------- Hindsight Experience Replay (HER) ----------------
 class HERReplayBuffer:
-    def __init__(self, max_size, her_k=4):
+    def __init__(self, max_size, her_k=10):
         self.buffer = deque(maxlen=max_size)
         self.her_k = her_k
 
@@ -225,7 +225,6 @@ for episode in range(num_episodes):
 
         # Entrena el modelo si hay suficientes datos en el buffer
         if len(sac.replay_buffer.buffer) > 256:
-            print(f"entrando a train")
             sac.train(batch_size=256)
 
         # Termina el episodio si está completo
