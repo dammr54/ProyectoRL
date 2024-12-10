@@ -176,19 +176,8 @@ def get_state(data):
 def calculate_reward(data, target_position, all_rewards, tolerance, tope_tolerance=0.05):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-    # reward = -distance_to_target * 1
-    # print(f"old tolerance: {tolerance}")
-    # print(f"distance: {distance_to_target}")
-    # if distance_to_target < tolerance:
-    #     reward += distance_to_target
-    #     dif_tolerance_distance = tolerance - distance_to_target
-    #     if tolerance - dif_tolerance_distance >= tope_tolerance:
-    #         tolerance -= dif_tolerance_distance
-    #     else:
-    #         tolerance = tope_tolerance
-        # tolerance -= (tolerance - distance_to_target)
-        # print(f"new tolerance: {tolerance}")
-        # print("omg un reward")
+    if tolerance < 0.05:
+        tolerance = 0.05
     if distance_to_target < tolerance:
         reward = distance_to_target
     else:
@@ -209,7 +198,7 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 150
 max_steps = 200
 goal = np.array([0.5, 0.5, 0.5])
-tolerance = 0.9
+tolerance = 0.8
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
@@ -250,8 +239,7 @@ for episode in range(num_episodes):
     # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
     min_distance = min(all_distances)
-    tolerance -= (tolerance - min_distance)
-    print(f"Distancia más cercana: {min_distance}")
+    tolerance = min_distance
     print(f"Nueva Tolerance: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
