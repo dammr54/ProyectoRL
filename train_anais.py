@@ -173,7 +173,7 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, all_rewards, tolerance, tope_tolerance=0.1):
+def calculate_reward(data, target_position, all_rewards, tolerance, tope_tolerance=0.05):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 1
@@ -224,7 +224,7 @@ for episode in range(num_episodes):
         # Calcula el nuevo estado y la recompensa
         next_state = get_state(data)
         reward, tolerance = calculate_reward(data, goal, all_rewards, tolerance)
-        all_rewards.append(reward)
+        # all_rewards.append(reward)
         done = step == max_steps - 1
 
         # Agrega la transición al buffer de experiencia
@@ -244,6 +244,7 @@ for episode in range(num_episodes):
 
     # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
+    print(f"Tolerance actual: {tolerance}")
 
     # Guarda el modelo cada 50 episodios
     if (episode + 1) % 50 == 0:
