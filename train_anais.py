@@ -6,9 +6,8 @@ import random
 import numpy as np
 import mujoco
 
-device_ = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"device: {device_}")
-device = torch.device(device_)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {device}")
 
 # ---------------- Definición de Redes ------------------------
 class Actor(nn.Module):
@@ -82,7 +81,7 @@ class HERReplayBuffer:
 
 # ---------------- Soft Actor-Critic (SAC) ----------------
 class SAC:
-    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.99, tau=0.005, alpha="auto"):
+    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=1e-4, gamma=0.99, tau=0.01, alpha=0.1):
         self.actor = Actor(state_dim, goal_dim, action_dim).to(device)
         self.critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
@@ -100,16 +99,7 @@ class SAC:
 
         self.gamma = gamma
         self.tau = tau
-        self.max_action = max_action
-
-        # Si alpha es "auto", inicializamos log_alpha para aprenderlo
-        if alpha == "auto":
-            self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
-            self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
-            self.target_entropy = -action_dim  # Entropía objetivo para el espacio de acciones
-            self.alpha = self.log_alpha.exp()
-        else:
-            self.alpha = alpha
+        self.alpha = alpha
 
     def select_action(self, state, goal):
         state = torch.tensor(state, dtype=torch.float32).to(device).unsqueeze(0)
@@ -151,14 +141,6 @@ class SAC:
         actor_loss.backward()
         self.actor_optimizer.step()
 
-        # Actualizamos el valor de alpha solo si está en "auto"
-        if hasattr(self, "log_alpha"):
-            alpha_loss = -(self.log_alpha * (log_probs + self.target_entropy).detach()).mean()
-            self.alpha_optimizer.zero_grad()
-            alpha_loss.backward()
-            self.alpha_optimizer.step()
-            self.alpha = self.log_alpha.exp()
-
         # Actualización de las redes objetivo (target networks)
         for param, target_param in zip(self.critic1.parameters(), self.target_critic1.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
@@ -168,40 +150,25 @@ class SAC:
     def add_to_buffer(self, transition):
         self.replay_buffer.add(transition)
 
-
 # ---------------- Entrenamiento del Agente ----------------
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_penalty=-10):
-    """
-    Calcula la recompensa basada en la distancia al objetivo y ajusta la tolerancia adaptativa.
-
-    Args:
-        data: Datos de simulación de MuJoCo.
-        target_position: Posición objetivo.
-        tolerance: Tolerancia actual para considerar la proximidad como recompensa positiva.
-        tope_tolerance: Tolerancia mínima permitida.
-        max_penalty: Penalización máxima por estar lejos del objetivo.
-
-    Returns:
-        reward: Recompensa calculada.
-        new_tolerance: Nueva tolerancia adaptativa.
-        distance_to_target: Distancia actual al objetivo.
-    """
-    end_effector_position = data.xpos[6]  # Posición de la herramienta final
+def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05):
+    end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
     if distance_to_target < tolerance:
-        reward = 1 / (distance_to_target + 1e-6)  # Mayor recompensa para distancias pequeñas
+        reward = 1 / (distance_to_target + 1e-6)
         if distance_to_target < tope_tolerance:
-            reward += 10  # Bonificación por alcanzar la meta
+            reward += 10
     else:
-        reward = max_penalty * (distance_to_target / tolerance)  # Penalización escalada
+        reward = -distance_to_target
 
-    # Ajusta la tolerancia para el próximo paso
     new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
+    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)
 
+    reward = np.clip(reward, -10, 10)
     return reward, new_tolerance, distance_to_target
 
 xml_path = "franka_emika_panda/scene.xml"
@@ -218,8 +185,7 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 150
 max_steps = 200
 goal = np.array([0.5, 0.5, 0.5])
-tolerance = 0.8
-
+tolerance = 0.9
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
@@ -230,14 +196,12 @@ for episode in range(num_episodes):
     for step in range(max_steps):
         action = sac.select_action(state, goal)
         apply_action = np.clip(action, -1, 1)
-
         data.ctrl[:] = apply_action
         mujoco.mj_step(model, data)
 
         next_state = get_state(data)
-        reward, tolerance, distance_to_target = calculate_reward(
-            data, goal, tolerance, tope_tolerance=0.05
-        )
+        reward, tolerance, distance_to_target = calculate_reward(data, goal,
+        tolerance)
         all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
@@ -267,4 +231,3 @@ for episode in range(num_episodes):
             "critic1_optimizer": sac.critic1_optimizer.state_dict(),
             "critic2_optimizer": sac.critic2_optimizer.state_dict(),
         }, f"sac_checkpoint_{episode + 1}.pth")
-
