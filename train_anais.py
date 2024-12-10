@@ -181,7 +181,12 @@ def calculate_reward(data, target_position, all_rewards, tolerance, tope_toleran
     # print(f"distance: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += distance_to_target
-        tolerance -= (tolerance - distance_to_target)
+        dif_tolerance_distance = tolerance - distance_to_target
+        if tolerance - dif_tolerance_distance >= tope_tolerance:
+            tolerance -= dif_tolerance_distance
+        else:
+            tolerance = tope_tolerance
+        # tolerance -= (tolerance - distance_to_target)
         # print(f"new tolerance: {tolerance}")
         # print("omg un reward")
     return reward, tolerance
@@ -200,13 +205,13 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 num_episodes = 150
 max_steps = 200
 goal = np.array([0.5, 0.5, 0.5])
+tolerance = 0.9
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
     all_rewards = []
-    tolerance = 0.9
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
