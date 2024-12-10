@@ -181,9 +181,9 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
     reward -= 0.05 * joint_position_error  # Penaliza la desviación de las posiciones de las articulaciones
 
     # Verificar colisiones
-    collision = np.any(data.collision)
-    if collision:
-        reward -= 10  # Penaliza las colisiones fuertemente
+    # collision = np.any(data.collision)
+    # if collision:
+    #     reward -= 10  # Penaliza las colisiones fuertemente
 
     # Actualizar tolerancia
     new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
