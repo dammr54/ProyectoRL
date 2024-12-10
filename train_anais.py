@@ -173,10 +173,11 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance=0.05):
+def calculate_reward(data, target_position, tolerance=0.1):
     end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
     reward = -distance_to_target * 10
+    print(f"distance to target: {distance_to_target}")
     if distance_to_target < tolerance:
         reward += 10.0
         print("omg un reward")
