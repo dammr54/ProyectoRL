@@ -68,17 +68,19 @@ class HERReplayBuffer:
                 augmented_samples.append((state, action, new_reward, next_state, done, new_goal))
 
         augmented_samples.extend(samples)
+        augmented_samples = np.array(augmented_samples, dtype=object)
         states, actions, rewards, next_states, dones, goals = zip(*augmented_samples)
-        return (torch.tensor(states, dtype=torch.float32),
-                torch.tensor(actions, dtype=torch.float32),
-                torch.tensor(rewards, dtype=torch.float32).unsqueeze(1),
-                torch.tensor(next_states, dtype=torch.float32),
-                torch.tensor(dones, dtype=torch.float32).unsqueeze(1),
-                torch.tensor(goals, dtype=torch.float32))
+
+        return (torch.tensor(np.array(states), dtype=torch.float32),
+                torch.tensor(np.array(actions), dtype=torch.float32),
+                torch.tensor(np.array(rewards), dtype=torch.float32).unsqueeze(1),
+                torch.tensor(np.array(next_states), dtype=torch.float32),
+                torch.tensor(np.array(dones), dtype=torch.float32).unsqueeze(1),
+                torch.tensor(np.array(goals), dtype=torch.float32))
 
 # ---------------- Soft Actor-Critic (SAC) ----------------
 class SAC:
-    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2):
+    def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.99, tau=0.005, alpha="auto"):
         self.actor = Actor(state_dim, goal_dim, action_dim).to(device)
         self.critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
@@ -96,8 +98,14 @@ class SAC:
 
         self.gamma = gamma
         self.tau = tau
-        self.alpha = alpha
         self.max_action = max_action
+
+        if alpha == "auto":
+            self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
+            self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
+            self.target_entropy = -action_dim
+        else:
+            self.alpha = alpha
 
     def select_action(self, state, goal):
         state = torch.tensor(state, dtype=torch.float32).to(device).unsqueeze(0)
@@ -139,6 +147,13 @@ class SAC:
         actor_loss.backward()
         self.actor_optimizer.step()
 
+        if hasattr(self, "log_alpha"):
+            alpha_loss = -(self.log_alpha * (log_probs + self.target_entropy).detach()).mean()
+            self.alpha_optimizer.zero_grad()
+            alpha_loss.backward()
+            self.alpha_optimizer.step()
+            self.alpha = self.log_alpha.exp()
+
         for param, target_param in zip(self.critic1.parameters(), self.target_critic1.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
         for param, target_param in zip(self.critic2.parameters(), self.target_critic2.parameters()):
@@ -147,45 +162,22 @@ class SAC:
     def add_to_buffer(self, transition):
         self.replay_buffer.add(transition)
 
+# ---------------- Entrenamiento del Agente ----------------
 def get_state(data):
-    """Obtiene el estado actual del sistema."""
-    return np.concatenate([data.qpos, data.qvel])  # Posiciones y velocidades combinadas
-
-def step_simulation(model, data):
-    """Avanza la simulación en MuJoCo."""
-    mujoco.mj_step(model, data)
-
-def apply_action(data, action, model):
-    """Escala la acción y la aplica al sistema."""
-    action = np.clip(action, -1, 1)  # Asegurarse de que las acciones están en [-1, 1]
-    ctrl_min = model.actuator_ctrlrange[:, 0]
-    ctrl_max = model.actuator_ctrlrange[:, 1]
-    scaled_action = ctrl_min + (action + 1) * 0.5 * (ctrl_max - ctrl_min)
-    data.ctrl[:] = scaled_action
+    return np.concatenate([data.qpos, data.qvel])
 
 def calculate_reward(data, target_position, tolerance=0.05):
-    """
-    Calcula la recompensa basada en la distancia al objetivo.
-    """
-    end_effector_id = 6
-    end_effector_position = data.xpos[end_effector_id]
+    end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-    reward = -distance_to_target * 100  # Penalización por distancia
-
-    # Bonificación si está dentro de la tolerancia
+    reward = -distance_to_target * 10
     if distance_to_target < tolerance:
         reward += 10.0
-
     return reward
 
-# Ruta al modelo XML
 xml_path = "franka_emika_panda/scene.xml"
-
-# Cargar el modelo de MuJoCo
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 
-# Configuración de SAC
 state_dim = model.nq + model.nv
 goal_dim = 3
 action_dim = model.nu
@@ -195,36 +187,36 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 150
 max_steps = 200
-goal = np.array([0.5, 0.5, 0.5])  # Meta fija, ajustar si es necesario
+goal = np.array([0.5, 0.5, 0.5])
 
-# Entrenamiento del Agente
 for episode in range(num_episodes):
-    mujoco.mj_resetData(model, data)  # Reinicia la simulación
+    mujoco.mj_resetData(model, data)
     state = get_state(data)
     episode_reward = 0
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
-        apply_action(data, action, model)
-        step_simulation(model, data)
-
+        apply_action = np.clip(action, -1, 1)  # Escalar acción
+        sac.add_to_buffer((state, apply_action, reward, next_state, done, goal))
         next_state = get_state(data)
         reward = calculate_reward(data, goal)
         done = step == max_steps - 1
-
-        sac.add_to_buffer((state, action, reward, next_state, done, goal))
+        # Actualiza el estado actual y acumula la recompensa
         state = next_state
         episode_reward += reward
 
+        # Entrena el modelo si hay suficientes datos en el buffer
         if len(sac.replay_buffer.buffer) > 256:
             sac.train(batch_size=256)
 
+        # Termina el episodio si está completo
         if done:
             break
 
+    # Imprime la recompensa total por episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
 
-    # Guardar el modelo cada 50 episodios
+    # Guarda el modelo cada 50 episodios
     if (episode + 1) % 50 == 0:
         torch.save({
             "actor": sac.actor.state_dict(),
@@ -234,3 +226,4 @@ for episode in range(num_episodes):
             "critic1_optimizer": sac.critic1_optimizer.state_dict(),
             "critic2_optimizer": sac.critic2_optimizer.state_dict(),
         }, f"sac_checkpoint_{episode + 1}.pth")
+
