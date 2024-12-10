@@ -216,6 +216,7 @@ for episode in range(num_episodes):
     state = get_state(data)
     episode_reward = 0
     all_distances = []
+    all_rewards = []
 
     for step in range(max_steps):
         action = sac.select_action(state, goal)
