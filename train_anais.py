@@ -157,14 +157,6 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_desired_orientation(target_position):
-    # Asumimos que el origen es [0, 0, 0], ajusta según sea necesario.
-    origin = np.array([0, 0, 0])
-    vector_to_target = target_position - origin
-
-    # Normalizamos para obtener un vector unitario.
-    desired_orientation = vector_to_target / np.linalg.norm(vector_to_target)
-    return desired_orientation
 
 def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
     # Posición del efector final
@@ -172,7 +164,7 @@ def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
     # Calcula la orientación deseada
-    desired_orientation = calculate_desired_orientation(target_position)
+    desired_orientation = calculate_desired_orientation(end_effector_position, target_position)
 
     # Premiar o penalizar según la distancia al objetivo
     if distance_to_target <= tolerance:
