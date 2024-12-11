@@ -57,7 +57,7 @@ action_dim = 8
 
 # Cargar modelo del actor
 actor = ActorNetwork(state_dim, action_dim)
-model_path = "modelos_entrenados/sac_checkpoint_100.pth"
+model_path = "ANAIS_sac_checkpoint_100.pth"
 checkpoint = torch.load(model_path)
 actor.load_state_dict(checkpoint["actor"])
 actor.eval()
