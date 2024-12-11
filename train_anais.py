@@ -166,133 +166,52 @@ def calculate_desired_orientation(target_position):
     desired_orientation = vector_to_target / np.linalg.norm(vector_to_target)
     return desired_orientation
 
-
-def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
+def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
     # Posición del efector final
-    end_effector_position = data.xpos[6]
+    end_effector_position = data.xpos[6]  # Ajustar el índice según tu modelo
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
-    # Calculamos la orientación deseada
+    # Calcula la orientación deseada
     desired_orientation = calculate_desired_orientation(target_position)
-
-    # Orientación actual y cálculo del error
-    current_orientation = data.xmat[6][:3]  # Orientación actual del efector
-    orientation_error = np.linalg.norm(current_orientation - desired_orientation)
-
-    # Cinemática inversa para obtener posiciones deseadas de las articulaciones
-    desired_joint_positions = compute_inverse_kinematics(model, data, target_position, desired_orientation)
-
-    # Penalización por desviación de las articulaciones
-    current_joint_positions = data.qpos[:model.nq]
-    joint_position_error = np.linalg.norm(current_joint_positions - desired_joint_positions)
 
     # Premiar o penalizar según la distancia al objetivo
     if distance_to_target <= tolerance:
-        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa inversa a la distancia
+        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa positiva inversamente proporcional a la distancia
         if distance_to_target < tope_tolerance:
-            reward += 20  # Bonificación adicional
+            reward += 20  # Bonificación adicional si está muy cerca del objetivo
     else:
-        reward = -10 * distance_to_target  # Penalización fuera de la tolerancia
+        reward = -10 * distance_to_target  # Penalización proporcional a la distancia
 
-    # Penalizar desviación de orientación
-    reward -= 5 * orientation_error  # Ajustar coeficiente según la importancia de la orientación
-
-    # Penalizar el esfuerzo (torque)
-    torque_effort = np.sum(np.abs(data.ctrl))
+    # Penalización por esfuerzo (torque de los actuadores)
+    torque_effort = np.sum(np.abs(data.ctrl))  # Magnitud del control aplicado
     reward -= 0.01 * torque_effort
 
-    # Penalizar desviación de articulaciones
+    # Penalización por desviación de orientación
+    current_orientation = data.xmat[6][:3]  # Obtener la orientación actual del efector final
+    orientation_error = np.linalg.norm(current_orientation - desired_orientation)
+    reward -= 0.1 * orientation_error
+
+    # Penalización por desviación de las articulaciones
+    joint_positions = data.qpos[:model.nq]  # Posiciones actuales de las articulaciones
+    joint_velocity = data.qvel[:model.nv]  # Velocidades actuales de las articulaciones
+    desired_joint_positions = np.zeros(model.nq)  # Ajustar según el estado objetivo de las articulaciones
+    joint_position_error = np.linalg.norm(joint_positions - desired_joint_positions)
     reward -= 0.05 * joint_position_error
 
     # Actualización de tolerancia
-    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
-    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)
-    new_tolerance = min(new_tolerance, max_tolerance)
+    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)  # Reduce la tolerancia
+    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Limita el incremento de tolerancia
+    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a max_tolerance
 
-    # Limitar recompensa
+    # Clipping de la recompensa
     reward = np.clip(reward, -50, 50)
 
     return reward, new_tolerance, distance_to_target
 
 
-from scipy.spatial.transform import Rotation as R
-import numpy as np
-
-import mujoco
-import numpy as np
-
-def compute_inverse_kinematics(model, data, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
-    # Set initial joint positions (if not provided)
-    if q_init is None:
-        q_init = data.qpos.copy()
-
-    # Convert target orientation to quaternion if it's a rotation matrix or Euler angles
-    if isinstance(target_orientation, np.ndarray):
-        if target_orientation.shape == (3, 3):
-            # Target orientation is a rotation matrix, convert to quaternion
-            target_orientation = R.from_matrix(target_orientation).as_quat()
-        elif target_orientation.shape == (3,):
-            # Target orientation is a rotation vector (Euler angles), convert to quaternion
-            target_orientation = R.from_rotvec(target_orientation).as_quat()
-
-    # Target position and orientation for the end-effector
-    target_pos = target_position
-    target_rot = target_orientation
-
-    # Start with initial joint angles
-    q = q_init.copy()
-
-    for _ in range(max_iters):
-        # Set the joint angles in the model
-        data.qpos[:] = q
-        
-        # Forward kinematics: Compute the current position and orientation of the end-effector
-        mujoco.mj_forward(model, data)
-
-        # Get the current position of the end-effector (the sixth element in data.xpos)
-        end_effector_pos = data.xpos[6]  # Aquí se usa data[6] como posición del end effector
-        end_effector_rot = data.xmat[6].reshape(3, 3)  # Aquí se usa data[6] como rotación del end effector
-
-        # Compute the position error (in 3D space)
-        pos_error = target_pos - end_effector_pos
-        
-        # Compute the orientation error (quaternion difference)
-        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Convert to quaternion
-        
-        # Ensure target_rot is a quaternion (already done earlier)
-        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Quaternion difference
-        rot_error = rot_error.as_rotvec()  # Convert to rotation vector (angular velocity)
-
-        # Check if the errors are below the tolerance
-        if np.linalg.norm(pos_error) < tolerance and np.linalg.norm(rot_error) < tolerance:
-            return q
-
-        # Compute the Jacobian matrix for the end-effector
-        jacobian = np.zeros((6, len(q)))  # Initialize Jacobian as a 6xN matrix (6 for position+orientation, N for joints)
-        
-        # Mujoco API for Jacobian calculation (you may need to adjust this based on the specific version you're using)
-        mujoco.mjtJacobian(model, data, jacobian, 6)  # Calculate Jacobian for end-effector (index 6)
-
-        # Calculate the task-space error (position + orientation)
-        task_error = np.concatenate([pos_error, rot_error])
-
-        # Solve for the joint velocity (using pseudo-inverse of Jacobian)
-        jacobian_pseudo_inv = np.linalg.pinv(jacobian)
-        joint_velocity = jacobian_pseudo_inv @ task_error
-
-        # Update the joint angles using the calculated velocity
-        q += joint_velocity
-
-        # Ensure joint angles stay within limits
-        for i, joint in enumerate(model.joint_types):
-            if joint == mujoco.mjJOINT_FREE:
-                continue
-            lower_limit = model.jnt_range[0, i]
-            upper_limit = model.jnt_range[1, i]
-            q[i] = np.clip(q[i], lower_limit, upper_limit)
-
-    return q
-
+def calculate_desired_orientation(end_effector_position, target_position):
+    direction_to_target = target_position - end_effector_position
+    return direction_to_target / np.linalg.norm(direction_to_target)
 
 
 xml_path = "franka_emika_panda/scene.xml"
@@ -346,7 +265,7 @@ for episode in tqdm(range(num_episodes)):
         mujoco.mj_step(model, data)
 
         next_state = get_state(data)
-        reward, tolerance, distance_to_target = calculate_reward(model, data, goal, tolerance)
+        reward, tolerance, distance_to_target = calculate_reward(data, goal, tolerance)
         all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
