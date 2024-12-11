@@ -87,6 +87,7 @@ action_dim = 8  # Número de actuadores controlados
 # Crear y cargar el modelo del actor
 actor = ActorNetwork(state_dim, action_dim)
 model_path = "modelos_entrenados/sac_checkpoint_100.pth"
+#model_path = "sac_checkpoint_1600.pth"
 checkpoint = torch.load(model_path)
 actor.load_state_dict(checkpoint["actor"])
 actor.eval()  # Modo evaluación
@@ -140,7 +141,9 @@ def main():
             cumulative_reward += reward
             steps_to_reach += 1
 
-            if np.linalg.norm(data.qpos[:3] - target_position) < success_threshold:
+            print(data.xpos[6])
+
+            if np.linalg.norm(data.xpos[6] - target_position) < success_threshold:
                 print(f"Objetivo {target_position} alcanzado en {steps_to_reach} pasos.")
                 break  # Pasar al siguiente objetivo
 
