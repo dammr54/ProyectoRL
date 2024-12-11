@@ -16,7 +16,8 @@ from gym import spaces
 # ---------------- Definición del modelo --------------------------
 #xml_path = "franka_fr3/scene.xml"  # Ruta archivo XML con el modelo sin grippers
 #xml_path = "franka_emika_panda/scene.xml"  # Ruta archivo XML con el modelo con grippers
-xml_path = "car1.xml"
+#xml_path = "car1.xml"
+xml_path = "franka_fr3_dual/scene.xml"
 
 # --- MuJoCo data structures: modelo, cámara, opciones de visualización ---
 model = mujoco.MjModel.from_xml_path(xml_path)  # MuJoCo model -> fisica, geometria y cinematica
@@ -26,10 +27,10 @@ opt = mujoco.MjvOption()  # personalizar renderizacion
 
 #print(dir(data))
 #help(data)
-#data.ctrl[:] = [0, 0., 0., 0., 0., 0., 0., 1000.,]
+data.ctrl[:] = [10., 0., 0., 0., 0., 0., 0., 0., 0.]
 #print(model.actuator_ctrlrange)
 #data.qpos[6] = 2
-print(data.qpos)
+print(data.ctrl)
 
 #print(data.ctrl[:])
 
