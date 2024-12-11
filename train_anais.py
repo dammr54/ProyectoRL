@@ -271,7 +271,7 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
         jacobian = np.zeros((6, len(q)))  # Initialize Jacobian as a 6xN matrix (6 for position+orientation, N for joints)
         
         # Mujoco API for Jacobian calculation (you may need to adjust this based on the specific version you're using)
-        mujoco.mj_jacobian(model, data, jacobian, 6)  # Calculate Jacobian for end-effector (index 6)
+        mujoco.mjtJacobian(model, data, jacobian, 6)  # Calculate Jacobian for end-effector (index 6)
 
         # Calculate the task-space error (position + orientation)
         task_error = np.concatenate([pos_error, rot_error])
