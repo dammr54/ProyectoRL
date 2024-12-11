@@ -215,14 +215,22 @@ def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.0
     return reward, new_tolerance, distance_to_target
 
 
+from scipy.spatial.transform import Rotation as R
+import numpy as np
+
 def compute_inverse_kinematics(model, data, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
     # Set initial joint positions (if not provided)
     if q_init is None:
         q_init = data.qpos.copy()
 
-    # Convert target orientation to quaternion if it's a rotation matrix
-    if isinstance(target_orientation, np.ndarray) and target_orientation.shape == (3, 3):
-        target_orientation = R.from_matrix(target_orientation).as_quat()
+    # Convert target orientation to quaternion if it's a rotation matrix or Euler angles
+    if isinstance(target_orientation, np.ndarray):
+        if target_orientation.shape == (3, 3):
+            # Target orientation is a rotation matrix, convert to quaternion
+            target_orientation = R.from_matrix(target_orientation).as_quat()
+        elif target_orientation.shape == (3,):
+            # Target orientation is a rotation vector (Euler angles), convert to quaternion
+            target_orientation = R.from_rotvec(target_orientation).as_quat()
 
     # Target position and orientation for the end-effector
     target_pos = target_position
@@ -249,7 +257,7 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
         # Convert current rotation matrix to a quaternion
         current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Aseguramos que esto sea un cuaternión
         
-        # Check if target_rot is already a quaternion (it should be)
+        # Ensure target_rot is a quaternion (already done earlier)
         rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Aseguramos que ambas sean cuaterniones
         rot_error = rot_error.as_rotvec()  # Convertir a un vector de rotación (angular velocity)
 
@@ -279,11 +287,6 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
             q[i] = np.clip(q[i], lower_limit, upper_limit)
 
     return q
-
-
-
-
-
 
 
 xml_path = "franka_emika_panda/scene.xml"
