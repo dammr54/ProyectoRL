@@ -243,6 +243,8 @@ def calculate_reward(data, target_position, target_orientation=None, tolerance=0
     # Obtener la posición actual del end-effector
     end_effector_position = data.xpos[end_effector_id]
 
+    print(end_effector_position)
+
     # Calcular distancia al objetivo
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
@@ -284,9 +286,9 @@ max_action = 1.0  # Acciones normalizadas [-1, 1]
 
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
-num_episodes = 120
-max_steps = 100  # Máximo de pasos por episodio
-goal = np.array([-0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
+num_episodes = 3000
+max_steps = 200  # Máximo de pasos por episodio
+goal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)  # Reinicia la simulación
@@ -323,7 +325,7 @@ for episode in range(num_episodes):
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
 
     # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 30 == 0:
+    if (episode + 1) % 50 == 0:
         torch.save({
         "actor": sac.actor.state_dict(),
         "critic1": sac.critic1.state_dict(),
