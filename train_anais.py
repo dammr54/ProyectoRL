@@ -206,7 +206,7 @@ def calculate_desired_orientation(end_effector_position, target_position):
     return direction_to_target / np.linalg.norm(direction_to_target)
 
 
-xml_path = "franka_emika_panda/scene.xml"
+xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 
