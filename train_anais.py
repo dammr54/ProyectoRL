@@ -180,7 +180,7 @@ def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.0
     orientation_error = np.linalg.norm(current_orientation - desired_orientation)
 
     # Cinemática inversa para obtener posiciones deseadas de las articulaciones
-    desired_joint_positions = compute_inverse_kinematics(model, target_position, desired_orientation)
+    desired_joint_positions = compute_inverse_kinematics(model, data, target_position, desired_orientation)
 
     # Penalización por desviación de las articulaciones
     current_joint_positions = data.qpos[:model.nq]
@@ -215,7 +215,7 @@ def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.0
     return reward, new_tolerance, distance_to_target
 
 
-def compute_inverse_kinematics(model, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
+def compute_inverse_kinematics(model, data, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
     # Set initial joint positions (if not provided)
     if q_init is None:
         q_init = data.qpos.copy()
@@ -236,27 +236,26 @@ def compute_inverse_kinematics(model, target_position, target_orientation, q_ini
         data.qpos[:] = q
         
         # Forward kinematics: Compute the current position and orientation of the end-effector
-        mujoco.mj_forward(model)
+        mujoco.mj_forward(model, data)
 
-        # Get the current position of the end-effector (the last body in the chain, e.g., the gripper)
-        end_effector_pos = data.xpos[model.geom_name2id('end_effector')]
-        end_effector_rot = data.xmat[model.geom_name2id('end_effector')].reshape(3, 3)
+        # Get the current position of the end-effector (the sixth element in data.xpos)
+        end_effector_pos = data.xpos[6]  # Aquí se usa data[6] como posición del end effector
+        end_effector_rot = data.xmat[6].reshape(3, 3)  # Aquí se usa data[6] como rotación del end effector
 
         # Compute the position error (in 3D space)
         pos_error = target_pos - end_effector_pos
         
         # Compute the orientation error (quaternion difference)
-        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()
-        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat.inv())
-        rot_error = rot_error.as_rotvec()
+        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Aseguramos que esto sea un cuaternión
+        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Aseguramos que ambas sean cuaterniones
+        rot_error = rot_error.as_rotvec()  # Convertir a un vector de rotación
 
         # Check if the errors are below the tolerance
         if np.linalg.norm(pos_error) < tolerance and np.linalg.norm(rot_error) < tolerance:
-            # print("Inverse kinematics solution found.")
             return q
 
         # Compute the Jacobian matrix for the end-effector
-        jacobian = data.get_Jacobian(model, 'end_effector')
+        jacobian = data.get_Jacobian(model, 6)  # Aquí se usa el índice 6 para el end effector
 
         # Calculate the task-space error (position + orientation)
         task_error = np.concatenate([pos_error, rot_error])
@@ -276,8 +275,9 @@ def compute_inverse_kinematics(model, target_position, target_orientation, q_ini
             upper_limit = model.jnt_range[1, i]
             q[i] = np.clip(q[i], lower_limit, upper_limit)
 
-    # print("Inverse kinematics did not converge.")
     return q
+
+
 
 
 
