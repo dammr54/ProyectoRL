@@ -218,7 +218,7 @@ def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.0
 def compute_inverse_kinematics(model, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
     # Set initial joint positions (if not provided)
     if q_init is None:
-        q_init = model.data.qpos.copy()
+        q_init = data.qpos.copy()
 
     # Convert target orientation to quaternion if it's a rotation matrix
     if isinstance(target_orientation, np.ndarray) and target_orientation.shape == (3, 3):
@@ -233,14 +233,14 @@ def compute_inverse_kinematics(model, target_position, target_orientation, q_ini
 
     for _ in range(max_iters):
         # Set the joint angles in the model
-        model.data.qpos[:] = q
+        data.qpos[:] = q
         
         # Forward kinematics: Compute the current position and orientation of the end-effector
         mujoco.mj_forward(model)
 
         # Get the current position of the end-effector (the last body in the chain, e.g., the gripper)
-        end_effector_pos = model.data.xpos[model.geom_name2id('end_effector')]
-        end_effector_rot = model.data.xmat[model.geom_name2id('end_effector')].reshape(3, 3)
+        end_effector_pos = data.xpos[model.geom_name2id('end_effector')]
+        end_effector_rot = data.xmat[model.geom_name2id('end_effector')].reshape(3, 3)
 
         # Compute the position error (in 3D space)
         pos_error = target_pos - end_effector_pos
@@ -256,7 +256,7 @@ def compute_inverse_kinematics(model, target_position, target_orientation, q_ini
             return q
 
         # Compute the Jacobian matrix for the end-effector
-        jacobian = model.data.get_Jacobian(model, 'end_effector')
+        jacobian = data.get_Jacobian(model, 'end_effector')
 
         # Calculate the task-space error (position + orientation)
         task_error = np.concatenate([pos_error, rot_error])
