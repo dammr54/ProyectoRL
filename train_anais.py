@@ -285,6 +285,7 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
 
 
 
+
 xml_path = "franka_emika_panda/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
