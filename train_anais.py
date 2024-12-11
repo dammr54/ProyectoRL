@@ -158,44 +158,50 @@ def get_state(data):
 
 def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
     # Posición del efector final
-    end_effector_position = data.xpos[6]  # Asumiendo que el índice 6 es el efector final
+    end_effector_position = data.xpos[6]  # Ajustar el índice según tu modelo
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
+
+    # Calcula la orientación deseada
+    desired_orientation = calculate_desired_orientation(end_effector_position, target_position)
 
     # Premiar o penalizar según la distancia al objetivo
     if distance_to_target <= tolerance:
-        # Distancia dentro de la tolerancia: recompensa positiva que aumenta al acercarse
-        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa proporcional inversa a la distancia
+        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa positiva inversamente proporcional a la distancia
         if distance_to_target < tope_tolerance:
-            reward += 20  # Bonificación si está muy cerca del objetivo
+            reward += 20  # Bonificación adicional si está muy cerca del objetivo
     else:
-        # Distancia fuera de la tolerancia: penalización proporcional a la distancia
         reward = -10 * distance_to_target  # Penalización proporcional a la distancia
 
     # Penalización por esfuerzo (torque de los actuadores)
-    torque_effort = np.sum(np.abs(data.ctrl))  # Control de los actuadores
-    reward -= 0.01 * torque_effort  # Penaliza el esfuerzo excesivo
+    torque_effort = np.sum(np.abs(data.ctrl))  # Magnitud del control aplicado
+    reward -= 0.01 * torque_effort
 
-    # Penalización por desviación de orientación (si es necesario)
-    desired_orientation = np.array([0, 0, 1])  # Define la orientación deseada
-    current_orientation = data.xmat[6][:3]  # Obtener la orientación del efector
+    # Penalización por desviación de orientación
+    current_orientation = data.xmat[6][:3]  # Obtener la orientación actual del efector final
     orientation_error = np.linalg.norm(current_orientation - desired_orientation)
-    reward -= 0.1 * orientation_error  # Penaliza la desviación de la orientación
+    reward -= 0.1 * orientation_error
 
-    # Penalización por la desviación de las articulaciones (si es necesario)
-    joint_positions = data.qpos[:model.nq]  # Posiciones de las articulaciones
-    joint_velocity = data.qvel[:model.nv]  # Velocidades de las articulaciones
-    desired_joint_positions = np.zeros(model.nq)  # Ajustar según el objetivo
+    # Penalización por desviación de las articulaciones
+    joint_positions = data.qpos[:model.nq]  # Posiciones actuales de las articulaciones
+    joint_velocity = data.qvel[:model.nv]  # Velocidades actuales de las articulaciones
+    desired_joint_positions = np.zeros(model.nq)  # Ajustar según el estado objetivo de las articulaciones
     joint_position_error = np.linalg.norm(joint_positions - desired_joint_positions)
-    reward -= 0.05 * joint_position_error  # Penaliza la desviación de las posiciones de las articulaciones
+    reward -= 0.05 * joint_position_error
 
     # Actualización de tolerancia
     new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)  # Reduce la tolerancia
-    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Evita que suba demasiado
-    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a 0.6
+    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Limita el incremento de tolerancia
+    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a max_tolerance
 
-    reward = np.clip(reward, -50, 50)  # Limita la recompensa para evitar valores extremos
+    # Clipping de la recompensa
+    reward = np.clip(reward, -50, 50)
+
     return reward, new_tolerance, distance_to_target
 
+
+def calculate_desired_orientation(end_effector_position, target_position):
+    direction_to_target = target_position - end_effector_position
+    return direction_to_target / np.linalg.norm(direction_to_target)
 
 
 
