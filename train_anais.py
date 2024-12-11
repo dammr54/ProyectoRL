@@ -218,6 +218,9 @@ def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.0
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
+import mujoco
+import numpy as np
+
 def compute_inverse_kinematics(model, data, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
     # Set initial joint positions (if not provided)
     if q_init is None:
@@ -254,19 +257,21 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
         pos_error = target_pos - end_effector_pos
         
         # Compute the orientation error (quaternion difference)
-        # Convert current rotation matrix to a quaternion
-        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Aseguramos que esto sea un cuaternión
+        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Convert to quaternion
         
         # Ensure target_rot is a quaternion (already done earlier)
-        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Aseguramos que ambas sean cuaterniones
-        rot_error = rot_error.as_rotvec()  # Convertir a un vector de rotación (angular velocity)
+        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Quaternion difference
+        rot_error = rot_error.as_rotvec()  # Convert to rotation vector (angular velocity)
 
         # Check if the errors are below the tolerance
         if np.linalg.norm(pos_error) < tolerance and np.linalg.norm(rot_error) < tolerance:
             return q
 
         # Compute the Jacobian matrix for the end-effector
-        jacobian = data.get_Jacobian(model, 6)  # Aquí se usa el índice 6 para el end effector
+        jacobian = np.zeros((6, len(q)))  # Initialize Jacobian as a 6xN matrix (6 for position+orientation, N for joints)
+        
+        # Mujoco API for Jacobian calculation (you may need to adjust this based on the specific version you're using)
+        mujoco.mj_jacobian(model, data, jacobian, 6)  # Calculate Jacobian for end-effector (index 6)
 
         # Calculate the task-space error (position + orientation)
         task_error = np.concatenate([pos_error, rot_error])
@@ -287,6 +292,7 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
             q[i] = np.clip(q[i], lower_limit, upper_limit)
 
     return q
+
 
 
 xml_path = "franka_emika_panda/scene.xml"
