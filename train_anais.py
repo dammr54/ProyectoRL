@@ -7,6 +7,7 @@ import numpy as np
 import mujoco
 import funciones_pickle as fpickle
 from tqdm import tqdm
+from scipy.spatial.transform import Rotation as R
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
@@ -156,52 +157,127 @@ class SAC:
 def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
-def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
+def calculate_desired_orientation(target_position):
+    # Asumimos que el origen es [0, 0, 0], ajusta según sea necesario.
+    origin = np.array([0, 0, 0])
+    vector_to_target = target_position - origin
+
+    # Normalizamos para obtener un vector unitario.
+    desired_orientation = vector_to_target / np.linalg.norm(vector_to_target)
+    return desired_orientation
+
+
+def calculate_reward(model, data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.6):
     # Posición del efector final
-    end_effector_position = data.xpos[6]  # Ajustar el índice según tu modelo
+    end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
 
-    # Calcula la orientación deseada
-    desired_orientation = calculate_desired_orientation(end_effector_position, target_position)
+    # Calculamos la orientación deseada
+    desired_orientation = calculate_desired_orientation(target_position)
+
+    # Orientación actual y cálculo del error
+    current_orientation = data.xmat[6][:3]  # Orientación actual del efector
+    orientation_error = np.linalg.norm(current_orientation - desired_orientation)
+
+    # Cinemática inversa para obtener posiciones deseadas de las articulaciones
+    desired_joint_positions = compute_inverse_kinematics(model, target_position, desired_orientation)
+
+    # Penalización por desviación de las articulaciones
+    current_joint_positions = data.qpos[:model.nq]
+    joint_position_error = np.linalg.norm(current_joint_positions - desired_joint_positions)
 
     # Premiar o penalizar según la distancia al objetivo
     if distance_to_target <= tolerance:
-        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa positiva inversamente proporcional a la distancia
+        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa inversa a la distancia
         if distance_to_target < tope_tolerance:
-            reward += 20  # Bonificación adicional si está muy cerca del objetivo
+            reward += 20  # Bonificación adicional
     else:
-        reward = -10 * distance_to_target  # Penalización proporcional a la distancia
+        reward = -10 * distance_to_target  # Penalización fuera de la tolerancia
 
-    # Penalización por esfuerzo (torque de los actuadores)
-    torque_effort = np.sum(np.abs(data.ctrl))  # Magnitud del control aplicado
+    # Penalizar desviación de orientación
+    reward -= 5 * orientation_error  # Ajustar coeficiente según la importancia de la orientación
+
+    # Penalizar el esfuerzo (torque)
+    torque_effort = np.sum(np.abs(data.ctrl))
     reward -= 0.01 * torque_effort
 
-    # Penalización por desviación de orientación
-    current_orientation = data.xmat[6][:3]  # Obtener la orientación actual del efector final
-    orientation_error = np.linalg.norm(current_orientation - desired_orientation)
-    reward -= 0.1 * orientation_error
-
-    # Penalización por desviación de las articulaciones
-    joint_positions = data.qpos[:model.nq]  # Posiciones actuales de las articulaciones
-    joint_velocity = data.qvel[:model.nv]  # Velocidades actuales de las articulaciones
-    desired_joint_positions = np.zeros(model.nq)  # Ajustar según el estado objetivo de las articulaciones
-    joint_position_error = np.linalg.norm(joint_positions - desired_joint_positions)
+    # Penalizar desviación de articulaciones
     reward -= 0.05 * joint_position_error
 
     # Actualización de tolerancia
-    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)  # Reduce la tolerancia
-    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Limita el incremento de tolerancia
-    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a max_tolerance
+    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)
+    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)
+    new_tolerance = min(new_tolerance, max_tolerance)
 
-    # Clipping de la recompensa
+    # Limitar recompensa
     reward = np.clip(reward, -50, 50)
 
     return reward, new_tolerance, distance_to_target
 
 
-def calculate_desired_orientation(end_effector_position, target_position):
-    direction_to_target = target_position - end_effector_position
-    return direction_to_target / np.linalg.norm(direction_to_target)
+def compute_inverse_kinematics(model, target_position, target_orientation, q_init=None, tolerance=1e-6, max_iters=100):
+    # Set initial joint positions (if not provided)
+    if q_init is None:
+        q_init = data.qpos.copy()
+
+    # Convert target orientation to quaternion if it's a rotation matrix
+    if isinstance(target_orientation, np.ndarray) and target_orientation.shape == (3, 3):
+        target_orientation = R.from_matrix(target_orientation).as_quat()
+
+    # Target position and orientation for the end-effector
+    target_pos = target_position
+    target_rot = target_orientation
+
+    # Start with initial joint angles
+    q = q_init.copy()
+
+    for _ in range(max_iters):
+        # Set the joint angles in the model
+        data.qpos[:] = q
+        
+        # Forward kinematics: Compute the current position and orientation of the end-effector
+        mujoco.mj_forward(model)
+
+        # Get the current position of the end-effector (the last body in the chain, e.g., the gripper)
+        end_effector_pos = data.xpos[model.geom_name2id('end_effector')]
+        end_effector_rot = data.xmat[model.geom_name2id('end_effector')].reshape(3, 3)
+
+        # Compute the position error (in 3D space)
+        pos_error = target_pos - end_effector_pos
+        
+        # Compute the orientation error (quaternion difference)
+        current_rot_quat = R.from_matrix(end_effector_rot).as_quat()
+        rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat.inv())
+        rot_error = rot_error.as_rotvec()
+
+        # Check if the errors are below the tolerance
+        if np.linalg.norm(pos_error) < tolerance and np.linalg.norm(rot_error) < tolerance:
+            # print("Inverse kinematics solution found.")
+            return q
+
+        # Compute the Jacobian matrix for the end-effector
+        jacobian = data.get_Jacobian(model, 'end_effector')
+
+        # Calculate the task-space error (position + orientation)
+        task_error = np.concatenate([pos_error, rot_error])
+
+        # Solve for the joint velocity (using pseudo-inverse of Jacobian)
+        jacobian_pseudo_inv = np.linalg.pinv(jacobian)
+        joint_velocity = jacobian_pseudo_inv @ task_error
+
+        # Update the joint angles using the calculated velocity
+        q += joint_velocity
+
+        # Ensure joint angles stay within limits
+        for i, joint in enumerate(model.joint_types):
+            if joint == mujoco.mjJOINT_FREE:
+                continue
+            lower_limit = model.jnt_range[0, i]
+            upper_limit = model.jnt_range[1, i]
+            q[i] = np.clip(q[i], lower_limit, upper_limit)
+
+    # print("Inverse kinematics did not converge.")
+    return q
 
 
 
@@ -256,7 +332,7 @@ for episode in tqdm(range(num_episodes)):
         mujoco.mj_step(model, data)
 
         next_state = get_state(data)
-        reward, tolerance, distance_to_target = calculate_reward(data, goal, tolerance)
+        reward, tolerance, distance_to_target = calculate_reward(model, data, goal, tolerance)
         all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
