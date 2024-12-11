@@ -246,9 +246,12 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
         pos_error = target_pos - end_effector_pos
         
         # Compute the orientation error (quaternion difference)
+        # Convert current rotation matrix to a quaternion
         current_rot_quat = R.from_matrix(end_effector_rot).as_quat()  # Aseguramos que esto sea un cuaternión
+        
+        # Check if target_rot is already a quaternion (it should be)
         rot_error = R.from_quat(target_rot) * R.from_quat(current_rot_quat).inv()  # Aseguramos que ambas sean cuaterniones
-        rot_error = rot_error.as_rotvec()  # Convertir a un vector de rotación
+        rot_error = rot_error.as_rotvec()  # Convertir a un vector de rotación (angular velocity)
 
         # Check if the errors are below the tolerance
         if np.linalg.norm(pos_error) < tolerance and np.linalg.norm(rot_error) < tolerance:
@@ -276,6 +279,7 @@ def compute_inverse_kinematics(model, data, target_position, target_orientation,
             q[i] = np.clip(q[i], lower_limit, upper_limit)
 
     return q
+
 
 
 
