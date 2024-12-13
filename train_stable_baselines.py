@@ -10,13 +10,13 @@ from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
 
 # ---------------- Adaptar entorno a Gym ----------------
 class MujocoEnvWithGoals(gym.Env):
-    def __init__(self, model, data, goal):
+    def __init__(self, model, data, goal, max_steps=1000):
         super(MujocoEnvWithGoals, self).__init__()
         self.model = model
         self.data = data
         self.goal = goal
         self.step_count = 0
-        self.max_steps = 1000
+        self.max_steps = max_steps
 
         # Espacios de observación y acción
         obs_dim = model.nq + model.nv
@@ -35,7 +35,7 @@ class MujocoEnvWithGoals(gym.Env):
             "desired_goal": spaces.box.Box(low=-np.inf, high=np.inf, shape=(3,))})
         self.action_space = spaces.box.Box(low=-1.0, high=1.0, shape=(model.nu,))
 
-        self.tolerance = 0.8  # Inicializar tolerancia para la recompensa
+        self.tolerance = 0.01  # Inicializar tolerancia para la recompensa
 
     # def step(self, action):
     #     self.data.ctrl[:] = action  # Asignar directamente la acción al controlador
@@ -99,12 +99,15 @@ class MujocoEnvWithGoals(gym.Env):
 xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
+# Entrenamiento del modelo
+num_episodes = 1000
+max_steps = 10000
 # max_steps = 1000
 
 goal = np.array([0.7, -0.5, 0.5])
 
 # Crear el entorno
-env = MujocoEnvWithGoals(model, data, goal)
+env = MujocoEnvWithGoals(model, data, goal, max_steps)
 
 # Configurar el modelo SAC con los parámetros correctos de HerReplayBuffer
 model = SAC(
@@ -126,9 +129,6 @@ model = SAC(
     verbose=1,
 )
 
-# Entrenamiento del modelo
-num_episodes = 100
-max_steps = 1000
 try:
     model.learn(total_timesteps=num_episodes * max_steps)
     model.save("her_sac_trained_model")
