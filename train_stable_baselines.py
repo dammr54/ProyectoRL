@@ -41,7 +41,7 @@ class MujocoEnvWithGoals(gym.Env):
         distance_to_target_actual = self.all_distances[-1]
         if self.step_count % 1000 == 0 and self.step_count != 0:
             print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
-            print(f"mean last 1000 rewards: {np.mean(self.all_rewards)[self.step_count - 1000: self.step_count]}")
+            print(f"mean last 1000 rewards: {np.mean(self.all_rewards[self.step_count - 1000: self.step_count])}")
             dump("all_distances.pickle", self.all_distances)
             dump("all_rewards.pickle", self.all_rewards)
     
