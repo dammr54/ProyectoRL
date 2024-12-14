@@ -56,9 +56,10 @@ class MujocoEnvWithGoals(gym.Env):
         reward = self.compute_reward(self.data, self.goal)
         self.all_rewards.append(reward)
         distance_to_target_actual = self.all_distances[-1]
-        if self.step_count % 1000 == 0 and self.step_count != 0:
+        if self.step_count % 5000 == 0 and self.step_count != 0:
             print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
-            print(f"mean last 1000 rewards: {np.mean(self.all_rewards[self.step_count - 1000: self.step_count])}")
+            print(f"mean last 1000 rewards: {np.mean(self.all_rewards[self.step_count - 5000: self.step_count])}")
+        if self.step_count % 1000 == 0 and self.step_count != 0:
             dump("all_distances.pickle", self.all_distances)
             dump("all_rewards.pickle", self.all_rewards)
     
@@ -121,8 +122,8 @@ xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 # Entrenamiento del modelo
-num_episodes = 1000
-max_steps = 100000
+num_episodes = 10
+max_steps = 1000000
 # max_steps = 1000
 
 goal = np.array([0.7, -0.5, 0.5])
