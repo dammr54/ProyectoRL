@@ -58,7 +58,7 @@ class MujocoEnvWithGoals(gym.Env):
         distance_to_target_actual = self.all_distances[-1]
         if self.step_count % 1000 == 0 and self.step_count != 0:
             print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
-            print(f"mean last 5000 rewards: {np.mean(self.all_rewards[self.step_count - 5000: self.step_count])}")
+            print(f"mean last 1000 rewards: {np.mean(self.all_rewards[self.step_count - 5000: self.step_count])}")
         if self.step_count % 1000 == 0 and self.step_count != 0:
             dump("all_distances.pickle", self.all_distances)
             dump("all_rewards.pickle", self.all_rewards)
@@ -71,8 +71,8 @@ class MujocoEnvWithGoals(gym.Env):
     
         # Aquí podemos considerar un criterio adicional para truncar si el episodio excede un límite de pasos
         # Por ejemplo, si max_steps es un parámetro del entorno:
-        if self.step_count >= self.max_steps:  # Asume step_count lleva cuenta de los pasos dados
-            truncated = True
+        # if self.step_count >= self.max_steps:  # Asume step_count lleva cuenta de los pasos dados
+        #     truncated = True
     
         info = {"is_success": float(terminated)}
         self.step_count += 1
