@@ -12,6 +12,9 @@ import time
 import numpy as np # manejo de la data
 import gym
 from gym import spaces
+import pkg_resources
+import sys
+import OpenGL
 
 # ---------------- Definición del modelo --------------------------
 #xml_path = "franka_fr3/scene.xml"  # Ruta archivo XML con el modelo sin grippers
@@ -177,3 +180,9 @@ def main():
 # ejecutar función principal
 if __name__ == '__main__':
     main()
+    # Obtener versiones
+    print("MuJoCo version:", mujoco.__version__)
+    print("NumPy version:", np.__version__)
+    print("Gym version:", gym.__version__)
+    print("Python version:", sys.version)
+    print("PyOpenGL version:", OpenGL.__version__)
