@@ -56,9 +56,9 @@ class MujocoEnvWithGoals(gym.Env):
         reward = self.compute_reward(self.data, self.goal)
         self.all_rewards.append(reward)
         distance_to_target_actual = self.all_distances[-1]
-        if self.step_count % 1000 == 0 and self.step_count != 0:
+        if self.step_count % 10000 == 0 and self.step_count != 0:
             print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
-            print(f"mean last 1000 rewards: {np.mean(self.all_rewards[self.step_count - 1000: self.step_count])}")
+            print(f"mean last 10000 rewards: {np.mean(self.all_rewards[self.step_count - 10000: self.step_count])}")
             model.save("her_sac_trained_model")
         if self.step_count % 1000 == 0 and self.step_count != 0:
             dump("all_distances.pickle", self.all_distances)
@@ -113,6 +113,8 @@ class MujocoEnvWithGoals(gym.Env):
         self.all_distances.append(distance_to_target)
         distance_change = last_distance_to_target - distance_to_target
         reward = 0.9 * distance_change + 0.1 * last_distance_to_target
+        if reward < 0:
+            print("neg")
         return reward
         # print(distance_to_target)
         # return -distance_to_target
@@ -151,7 +153,7 @@ model = SAC(
     ),
     verbose=1,
     gamma=0.99,
-    learning_rate=5e-4
+    learning_rate=1e-3
 )
 
 try:
