@@ -77,10 +77,6 @@ class HERReplayBuffer:
         self.buffer.append(transition)
 
     def sample(self, batch_size, data):
-        """
-        Muestra un batch del buffer y aplica HER con metas alternativas
-        basadas en `data.xpos[6]` (espacio independiente del estado).
-        """
         samples = random.sample(self.buffer, batch_size)
         augmented_samples = []
 
@@ -108,27 +104,14 @@ class HERReplayBuffer:
 # SAC Algorithm
 class SAC:
     def __init__(self, state_dim, goal_dim, action_dim, max_action, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2):
-        """
-        Inicializa el modelo SAC con HER.
-
-        Args:
-            state_dim (int): Dimensión del estado.
-            goal_dim (int): Dimensión de la meta (goal).
-            action_dim (int): Dimensión de las acciones.
-            max_action (float): Valor máximo permitido para las acciones (normalizado).
-            lr (float): Tasa de aprendizaje.
-            gamma (float): Factor de descuento.
-            tau (float): Factor de interpolación suave para las redes objetivo.
-            alpha (float): Parámetro de entropía para SAC.
-        """
-        # Ajustar redes para incluir estados y metas concatenados
+        # estados y metas concatenados
         self.actor = Actor(state_dim, goal_dim, action_dim).to(device)
         self.critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.target_critic1 = Critic(state_dim, goal_dim, action_dim).to(device)
         self.target_critic2 = Critic(state_dim, goal_dim, action_dim).to(device)
 
-        # Inicializar las redes objetivo como clones de las críticas originales
+        # redes objetivo como clones de las críticas originales
         self.target_critic1.load_state_dict(self.critic1.state_dict())
         self.target_critic2.load_state_dict(self.critic2.state_dict())
 
@@ -147,12 +130,6 @@ class SAC:
         self.max_action = max_action
 
     def select_action(self, state, goal):
-        # Convertir state y goal a tensores si no lo son
-        #state = torch.tensor(state, dtype=torch.float32).to(device) if not isinstance(state, torch.Tensor) else state
-        #goal = torch.tensor(goal, dtype=torch.float32).to(device) if not isinstance(goal, torch.Tensor) else goal
-
-        # Concatenar estado y meta
-        #state_goal = torch.cat([state, goal], dim=0).unsqueeze(0).to(device)  # Agregar dimensión para batch
         action, _ = self.actor.sample(state, goal)
         return action.cpu().detach().numpy().flatten()
 
@@ -163,9 +140,6 @@ class SAC:
             states.to(device), actions.to(device), rewards.to(device),
             next_states.to(device), dones.to(device), goals.to(device)
         )
-
-        #state_goal = torch.cat([states, goals], dim=1)
-        #next_state_goal = torch.cat([next_states, goals], dim=1)
 
         with torch.no_grad():
             next_actions, next_log_probs = self.actor.sample(next_states, goals)
@@ -206,68 +180,18 @@ class SAC:
 
 
 def get_state(data):
-    """Obtiene el estado actual del sistema."""
-    # Combina posiciones y velocidades de las articulaciones
     state = np.concatenate([data.qpos, data.qvel])
     return state
 
 def step_simulation(model, data):
-    """Avanza la simulación en MuJoCo."""
     mujoco.mj_step(model, data)
 
 def apply_action(data, action):
-    """Aplica la acción al sistema."""
     action = np.clip(action, -1, 1)
     ctrl_min = model.actuator_ctrlrange[:, 0]
     ctrl_max = model.actuator_ctrlrange[:, 1]
     scaled_action = ctrl_min + (action + 1) * 0.5 * (ctrl_max - ctrl_min)  # Escala [-1, 1] al rango [ctrl_min, ctrl_max]
     data.ctrl[:] = scaled_action
-
-#
-#def calculate_reward(data, target_position, target_orientation=None, tolerance=0.1):
-#    """
-#    Calcula la recompensa para el brazo robótico basado en la distancia al objetivo,
-#    orientación deseada y esfuerzo aplicado.
-#
-#    Args:
-#        data (mujoco.MjData): Datos dinámicos de MuJoCo.
-#        target_position (np.array): Coordenadas 3D de la posición objetivo (x, y, z).
-#        target_orientation (np.array, optional): Orientación objetivo (cuaternión o matriz de rotación).
-#        tolerance (float): Distancia tolerada para considerar que el objetivo fue alcanzado.
-#
-#    Returns:
-#        float: Valor de la recompensa.
-#    """
-#    end_effector_id = 6
-#
-#    # Obtener la posición actual del end-effector
-#    end_effector_position = data.xpos[end_effector_id]
-#
-#    print(end_effector_position)
-#
-#    # Calcular distancia al objetivo
-#    distance_to_target = np.linalg.norm(end_effector_position - target_position)
-#
-#    # Penalización por distancia al objetivo
-#    reward = -distance_to_target*100
-#
-#    # Bonificación por éxito si está dentro de la tolerancia
-#    if distance_to_target < tolerance:
-#        reward += 100.0  # Bonificación fija por alcanzar el objetivo
-#
-#    # Penalización opcional por desalineación de orientación
-#    if target_orientation is not None:
-#        # Orientación actual del end-effector (cuaternión)
-#        current_orientation = data.xquat[end_effector_id]
-#        # Diferencia de orientación (puedes ajustar según la métrica que desees usar)
-#        orientation_diff = np.linalg.norm(current_orientation - target_orientation)
-#        reward -= 0.1 * orientation_diff  # Penalización leve por desalineación
-#
-#    # Penalización por esfuerzo aplicado
-#    #control_effort = np.sum(np.square(data.ctrl))  # Esfuerzo total en los actuadores
-#    #reward -= 0.01 * control_effort
-#
-#    return reward
 
 def calculate_reward(data, target_position, all_distances):
     end_effector_position = data.xpos[6]
@@ -284,14 +208,6 @@ def calculate_reward(data, target_position, all_distances):
     return reward, distance_to_target
 
 def generate_random_goal(base_position=[0, 0, 0], radius=1):
-    """
-    Genera un objetivo aleatorio dentro de un radio especificado alrededor de una posición base.
-    Args:
-        base_position (np.array): Posición base [x, y, z].
-        radius (float): Radio máximo para el objetivo.
-    Returns:
-        np.array: Posición objetivo aleatoria [x, y, z].
-    """
     while True:
         random_offset = np.random.uniform(-radius, radius, size=3)
         random_goal = base_position + random_offset
@@ -318,10 +234,10 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 3000
 max_steps = 50000  # Máximo de pasos por episodio
-#oal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico]
+#goal = np.array([0.7, 0, 0.5])  # Meta fija
 
 goal_tolerance = 0.40
-base_goal_position = np.array([0, 0, 0])  # Posición base para los objetivos
+base_goal_position = np.array([0, 0, 0])  # Posición base para los objetivos dinamicos
 goal_radius = 1  # Radio máximo para los objetivos aleatorios
 
 #for episode in range(num_episodes):
