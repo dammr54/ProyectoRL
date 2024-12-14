@@ -19,6 +19,7 @@ class MujocoEnvWithGoals(gym.Env):
         self.max_steps = max_steps
         self.initial_effector_position = self.data.xpos[6]
         self.all_distances = []
+        self.all_rewards = []
 
         # Espacios de observación y acción
         obs_dim = model.nq + model.nv
@@ -36,10 +37,13 @@ class MujocoEnvWithGoals(gym.Env):
         mujoco.mj_step(self.model, self.data)
         obs = self._get_obs()
         reward = self.compute_reward(self.data, self.goal)
+        self.all_rewards.append(reward)
         distance_to_target_actual = self.all_distances[-1]
-        if self.step_count % 1000 == 0:
+        if self.step_count % 1000 == 0 and self.step_count != 0:
             print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
+            print(f"mean last 1000 rewards: {np.mean(self.all_rewards)[self.step_count - 1000: self.step_count]}")
             dump("all_distances.pickle", self.all_distances)
+            dump("all_rewards.pickle", self.all_rewards)
     
         terminated = False
         truncated = False
@@ -59,6 +63,7 @@ class MujocoEnvWithGoals(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         self.step_count = 0
         self.all_distances = []
+        self.all_rewards = []
         return self._get_obs(), {}
 
     def _get_obs(self):
