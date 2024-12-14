@@ -112,9 +112,9 @@ class MujocoEnvWithGoals(gym.Env):
             last_distance_to_target = distance_to_target
         self.all_distances.append(distance_to_target)
         distance_change = last_distance_to_target - distance_to_target
-        reward = 0.9 * distance_change + 0.1 * last_distance_to_target
-        if reward < 0:
-            print("neg")
+        reward = distance_change
+        # if reward < 0:
+        #     print("neg")
         return reward
         # print(distance_to_target)
         # return -distance_to_target
