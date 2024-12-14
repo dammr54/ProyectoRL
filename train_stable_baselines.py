@@ -7,6 +7,7 @@ from stable_baselines3 import SAC, HerReplayBuffer
 # from stable_baselines3.common.buffers import HerReplayBuffer
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
+from funciones_pickle import dump
 
 # ---------------- Adaptar entorno a Gym ----------------
 class MujocoEnvWithGoals(gym.Env):
@@ -17,6 +18,7 @@ class MujocoEnvWithGoals(gym.Env):
         self.goal = goal
         self.step_count = 0
         self.max_steps = max_steps
+        self.all_distances = []
 
         # Espacios de observación y acción
         obs_dim = model.nq + model.nv
@@ -52,11 +54,15 @@ class MujocoEnvWithGoals(gym.Env):
         mujoco.mj_step(self.model, self.data)
         obs = self._get_obs()
         reward = self.compute_reward(self.data, self.goal)
+        distance_to_target_actual = self.all_distances[-1]
+        if self.step_count % 1000 == 0:
+            print(f"actual distance: {distance_to_target_actual}")
+            dump("all_distances.pickle", self.all_distances)
     
         terminated = False
         truncated = False
     
-        if reward >= -self.tolerance:
+        if distance_to_target_actual <= self.tolerance:
             terminated = True
     
         # Aquí podemos considerar un criterio adicional para truncar si el episodio excede un límite de pasos
@@ -73,6 +79,7 @@ class MujocoEnvWithGoals(gym.Env):
     def reset(self, seed=None):
         mujoco.mj_resetData(self.model, self.data)
         self.step_count = 0
+        self.all_distances = []
         return self._get_obs(), {}
 
     def _get_obs(self):
@@ -93,7 +100,14 @@ class MujocoEnvWithGoals(gym.Env):
     def compute_reward(self, data, target_position, info=None):
         end_effector_position = self.data.xpos[6]
         distance_to_target = np.linalg.norm(end_effector_position - target_position)
-        return -distance_to_target
+        if len(self.all_distances) > 0:
+            last_distance_to_target = self.all_distances[-1]
+        else:
+            last_distance_to_target = distance_to_target
+        self.all_distances.append(distance_to_target)
+        return last_distance_to_target - distance_to_target
+        # print(distance_to_target)
+        # return -distance_to_target
 
 # ---------------- Configuración y Entrenamiento ----------------
 xml_path = "franka_fr3_dual/scene.xml"
