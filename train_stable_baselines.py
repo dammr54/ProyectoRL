@@ -169,4 +169,3 @@ model.save("her_sac_ANAIS_trained_model")
 # Evaluación del modelo
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
 print(f"Recompensa media: {mean_reward}, desviación estándar: {std_reward}")
-
