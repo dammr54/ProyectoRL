@@ -117,13 +117,13 @@ model = SAC(
         # n_envs=1,  # Número de entornos paralelos (1 en este caso)
         # optimize_memory_usage=False,  # Variante eficiente de memoria
         handle_timeout_termination=True,  # Manejar terminación por límite de tiempo
-        n_sampled_goal=4,  # Número de objetivos virtuales por transición
+        n_sampled_goal=1,  # Número de objetivos virtuales por transición
         goal_selection_strategy=GoalSelectionStrategy.FUTURE,  # Estrategia de selección de objetivos
         copy_info_dict=False  # No copiar info para computar recompensas
     ),
     verbose=1,
-    gamma=1,
-    learning_rate=1e-4
+    gamma=0.99,
+    learning_rate=1e-3
 )
 
 try:
