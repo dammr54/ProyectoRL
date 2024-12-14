@@ -79,14 +79,27 @@ class MujocoEnvWithGoals(gym.Env):
         return {"observation": observation, "achieved_goal": achieved_goal, "desired_goal": self.goal}
 
     def compute_reward(self, data, target_position, info=None):
-        end_effector_position = self.data.xpos[6] - self.initial_effector_position  # Transform coordinates to relative to the initial position
-        distance_to_target = np.linalg.norm(end_effector_position - target_position)
+        # Use the arm's end effector as the origin
+        end_effector_position = data.xpos[6]
+        relative_target_position = target_position - end_effector_position  # Transform to relative coordinates
+    
+        distance_to_target = np.linalg.norm(relative_target_position)
+    
         if len(self.all_distances) > 0:
             last_distance_to_target = self.all_distances[-1]
         else:
             last_distance_to_target = distance_to_target
+    
+        distance_change = last_distance_to_target - distance_to_target
+    
+        # Reward is positive if the distance to the target decreases (moves closer)
+        # Negative if the distance increases (moves away)
+        reward = distance_change
+    
         self.all_distances.append(distance_to_target)
-        return last_distance_to_target - distance_to_target
+    
+        return reward
+
 
 # ---------------- Configuración y Entrenamiento ----------------
 xml_path = "franka_fr3_dual/scene.xml"
