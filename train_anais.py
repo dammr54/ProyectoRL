@@ -7,7 +7,7 @@ import numpy as np
 import mujoco
 import funciones_pickle as fpickle
 from tqdm import tqdm
-from scipy.spatial.transform import Rotation as R
+# from scipy.spatial.transform import Rotation as R
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
@@ -158,47 +158,19 @@ def get_state(data):
     return np.concatenate([data.qpos, data.qvel])
 
 
-def calculate_reward(data, target_position, tolerance, tope_tolerance=0.05, max_tolerance_change=0.05, max_tolerance=0.8):
-    # Posición del efector final
-    end_effector_position = data.xpos[6]  # Ajustar el índice según tu modelo
+def calculate_reward(data, target_position, all_distances):
+    end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
-
-    # Calcula la orientación deseada
-    desired_orientation = calculate_desired_orientation(end_effector_position, target_position)
-
-    # Premiar o penalizar según la distancia al objetivo
-    if distance_to_target <= tolerance:
-        reward = 10 * (1 / (distance_to_target + 1e-6))  # Recompensa positiva inversamente proporcional a la distancia
-        if distance_to_target < tope_tolerance:
-            reward += 20  # Bonificación adicional si está muy cerca del objetivo
+    if len(all_distances) > 0:
+        last_distance_to_target = all_distances[-1]
     else:
-        reward = -10 * distance_to_target  # Penalización proporcional a la distancia
-
-    # Penalización por esfuerzo (torque de los actuadores)
-    torque_effort = np.sum(np.abs(data.ctrl))  # Magnitud del control aplicado
-    reward -= 0.01 * torque_effort
-
-    # Penalización por desviación de orientación
-    current_orientation = data.xmat[6][:3]  # Obtener la orientación actual del efector final
-    orientation_error = np.linalg.norm(current_orientation - desired_orientation)
-    reward -= 0.1 * orientation_error
-
-    # Penalización por desviación de las articulaciones
-    joint_positions = data.qpos[:model.nq]  # Posiciones actuales de las articulaciones
-    joint_velocity = data.qvel[:model.nv]  # Velocidades actuales de las articulaciones
-    desired_joint_positions = np.zeros(model.nq)  # Ajustar según el estado objetivo de las articulaciones
-    joint_position_error = np.linalg.norm(joint_positions - desired_joint_positions)
-    reward -= 0.05 * joint_position_error
-
-    # Actualización de tolerancia
-    new_tolerance = max(tolerance - (tolerance - distance_to_target), tope_tolerance)  # Reduce la tolerancia
-    new_tolerance = min(new_tolerance, tolerance + max_tolerance_change)  # Limita el incremento de tolerancia
-    new_tolerance = min(new_tolerance, max_tolerance)  # Limita la tolerancia máxima a max_tolerance
-
-    # Clipping de la recompensa
-    reward = np.clip(reward, -50, 50)
-
-    return reward, new_tolerance, distance_to_target
+        last_distance_to_target = distance_to_target
+    all_distances.append(distance_to_target)
+    distance_change = last_distance_to_target - distance_to_target
+    reward = distance_change
+    print(f"distance: {distance_to_target}")
+    print(f"reward: {reward}")
+    return reward, distance_to_target
 
 
 def calculate_desired_orientation(end_effector_position, target_position):
@@ -218,7 +190,7 @@ max_action = 1.0
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 100
-max_steps = 700
+max_steps = 5000
 goal = np.array([0.7, -0.5, 0.5])
 tolerance = 0.8
 mean_d = []
@@ -226,7 +198,7 @@ median_d = []
 min_d = []
 tolerance_final = []
 all_rewards = []
-
+all_distances = []
 
 for episode in tqdm(range(num_episodes)):
     mujoco.mj_resetData(model, data)
@@ -257,7 +229,7 @@ for episode in tqdm(range(num_episodes)):
         mujoco.mj_step(model, data)
 
         next_state = get_state(data)
-        reward, tolerance, distance_to_target = calculate_reward(data, goal, tolerance)
+        reward, distance_to_target = calculate_reward(data, goal, all_distances)
         all_distances.append(distance_to_target)
         done = step == max_steps - 1
 
@@ -272,21 +244,18 @@ for episode in tqdm(range(num_episodes)):
         if done:
             break
 
-    min_distance = min(all_distances)
-    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-    all_rewards.append(episode_reward)
-    print(f"    Distancia más cercana: {min_distance:.2f}")
-    min_d.append(min_distance)
-    print(f"    Promedio distancias: {np.mean(all_distances):.2f}")
-    mean_d.append(np.mean(all_distances))
-    print(f"    Mediana distancia: {np.median(all_distances):.2f}")
-    median_d.append(np.median(all_distances))
-    print(f"    Tolerancia final: {tolerance:.2f}")
-    tolerance_final.append(tolerance)
-
-    # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 5 == 0:
-        torch.save({
+        min_distance = min(all_distances)
+        # print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
+        all_rewards.append(episode_reward)
+        # print(f"    Distancia más cercana: {min_distance:.2f}")
+        min_d.append(min_distance)
+        # print(f"    Promedio distancias: {np.mean(all_distances):.2f}")
+        mean_d.append(np.mean(all_distances))
+        # print(f"    Mediana distancia: {np.median(all_distances):.2f}")
+        median_d.append(np.median(all_distances))
+        
+        if step % 1000 == 0:
+            torch.save({
             "actor": sac.actor.state_dict(),
             "critic1": sac.critic1.state_dict(),
             "critic2": sac.critic2.state_dict(),
@@ -294,9 +263,26 @@ for episode in tqdm(range(num_episodes)):
             "critic1_optimizer": sac.critic1_optimizer.state_dict(),
             "critic2_optimizer": sac.critic2_optimizer.state_dict(),
         }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
-        fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
-        fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
-        fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
-        fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
-        fpickle.dump(f"listas_resultados/tolerances_{episode + 1}.pickle", tolerance_final)
+            fpickle.dump(f"listas_resultados/all_rewards_{step}.pickle", all_rewards)
+            fpickle.dump(f"listas_resultados/min_distance_{step}.pickle", min_d)
+            fpickle.dump(f"listas_resultados/mean_distance_{step}.pickle", mean_d)
+            fpickle.dump(f"listas_resultados/median_distance_{step}.pickle", median_d)
+    # print(f"    Tolerancia final: {tolerance:.2f}")
+    # tolerance_final.append(tolerance)
+
+    # Guarda el modelo cada 50 episodios
+    # if (episode + 1) % 5 == 0:
+    #     torch.save({
+    #         "actor": sac.actor.state_dict(),
+    #         "critic1": sac.critic1.state_dict(),
+    #         "critic2": sac.critic2.state_dict(),
+    #         "actor_optimizer": sac.actor_optimizer.state_dict(),
+    #         "critic1_optimizer": sac.critic1_optimizer.state_dict(),
+    #         "critic2_optimizer": sac.critic2_optimizer.state_dict(),
+    #     }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
+    #     fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
+    #     fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
+    #     fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
+    #     fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
+    #     fpickle.dump(f"listas_resultados/tolerances_{episode + 1}.pickle", tolerance_final)
 
