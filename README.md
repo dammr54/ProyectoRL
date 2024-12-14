@@ -11,6 +11,7 @@
 # Modelos
 * franka_emika_panda contraresta la gravedad
 * franka_fr3_dual no contraresta la gravedad, este se debe descomprimir desde el .zip
+* Los archivos .pth tiene la información correspondiente a los pesos del actor para poder reproducir la simulación con la politica encontrada
 
 # Train
 * El archivo ```train.py``` contiene el código para entrenar el modelo con **nuestra propia implementación**.
@@ -18,9 +19,11 @@
 * Para replicar nuestro experimento <a target="_blank" href="https://colab.research.google.com/github/dammr54/ProyectoRL/blob/main/run%20train.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
-<<<<<<< HEAD
+
+# Data
+* La data se encuentra comprimida en los archivos pickle en la carpeta listas_resultados
+
 
 # Otros
 * funciones_pickle.py contiene funciones utiles para escritura y lectura de datos
-=======
->>>>>>> be298a3c15f037efd7b7826322c65cc988d4d0a9
+

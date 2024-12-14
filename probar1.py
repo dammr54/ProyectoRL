@@ -90,7 +90,7 @@ print(action_dim)
 actor = ActorNetwork(state_dim, action_dim)
 #model_path = "modelos_entrenados/sac_checkpoint_100.pth"
 #model_path = "sac_checkpoint_1600.pth"
-model_path = "ANAIS_sac_checkpoint_step_50000.pth"
+model_path = "ANAIS_sac_checkpoint_step_50000_2.pth"
 #model_path = "policy.pth"
 checkpoint = torch.load(model_path)
 #checkpoint = dict(checkpoint)
