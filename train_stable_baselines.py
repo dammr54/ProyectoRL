@@ -10,6 +10,17 @@ from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
 from funciones_pickle import dump
 
 # ---------------- Adaptar entorno a Gym ----------------
+# import gym
+import gymnasium as gym
+import numpy as np
+import mujoco
+from gymnasium import spaces
+from stable_baselines3 import SAC, HerReplayBuffer
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
+from funciones_pickle import dump
+
+# ---------------- Adaptar entorno a Gym ----------------
 class MujocoEnvWithGoals(gym.Env):
     def __init__(self, model, data, goal, max_steps=1000):
         super(MujocoEnvWithGoals, self).__init__()
@@ -18,36 +29,19 @@ class MujocoEnvWithGoals(gym.Env):
         self.goal = goal
         self.step_count = 0
         self.max_steps = max_steps
+        self.initial_effector_position = self.data.xpos[6]
         self.all_distances = []
 
         # Espacios de observación y acción
         obs_dim = model.nq + model.nv
-        # self.observation_space = spaces.Dict({
-        #     "observation": spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,)),
-        #     "achieved_goal": spaces.Box(low=-np.inf, high=np.inf, shape=(3,)),
-        #     "desired_goal": spaces.Box(low=-np.inf, high=np.inf, shape=(3,))
-        # })
-        # self.observation_space = obs_dim
-        # self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(model.nu,))
-        # self.action_space = model.nu
-        obs_dim = model.nq + model.nv
         self.observation_space = spaces.Dict({
             "observation": spaces.box.Box(low=-np.inf, high=np.inf, shape=(obs_dim,)),
             "achieved_goal": spaces.box.Box(low=-np.inf, high=np.inf, shape=(3,)),
-            "desired_goal": spaces.box.Box(low=-np.inf, high=np.inf, shape=(3,))})
+            "desired_goal": spaces.box.Box(low=-np.inf, high=np.inf, shape=(3,))
+        })
         self.action_space = spaces.box.Box(low=-1.0, high=1.0, shape=(model.nu,))
 
         self.tolerance = 0.01  # Inicializar tolerancia para la recompensa
-
-    # def step(self, action):
-    #     self.data.ctrl[:] = action  # Asignar directamente la acción al controlador
-    #     mujoco.mj_step(self.model, self.data)
-    #     obs = self._get_obs()
-    #     # reward = self.compute_reward(obs["achieved_goal"], obs["desired_goal"], None)
-    #     reward = self.compute_reward(self.data, self.goal)
-    #     done = reward >= -self.tolerance
-    #     info = {"is_success": float(done)}
-    #     return obs, reward, done, done, info
 
     def step(self, action):
         self.data.ctrl[:] = action  # Asignar directamente la acción al controlador
@@ -56,7 +50,7 @@ class MujocoEnvWithGoals(gym.Env):
         reward = self.compute_reward(self.data, self.goal)
         distance_to_target_actual = self.all_distances[-1]
         if self.step_count % 1000 == 0:
-            print(f"actual distance: {distance_to_target_actual}")
+            print(f"actual distance: {distance_to_target_actual} - step: {self.step_count}")
             dump("all_distances.pickle", self.all_distances)
     
         terminated = False
@@ -65,16 +59,13 @@ class MujocoEnvWithGoals(gym.Env):
         if distance_to_target_actual <= self.tolerance:
             terminated = True
     
-        # Aquí podemos considerar un criterio adicional para truncar si el episodio excede un límite de pasos
-        # Por ejemplo, si max_steps es un parámetro del entorno:
-        if self.step_count >= self.max_steps:  # Asume step_count lleva cuenta de los pasos dados
+        if self.step_count >= self.max_steps:
             truncated = True
     
         info = {"is_success": float(terminated)}
         self.step_count += 1
     
         return obs, reward, terminated, truncated, info
-
 
     def reset(self, seed=None):
         mujoco.mj_resetData(self.model, self.data)
@@ -83,22 +74,12 @@ class MujocoEnvWithGoals(gym.Env):
         return self._get_obs(), {}
 
     def _get_obs(self):
-        achieved_goal = self.data.xpos[6]
+        achieved_goal = self.data.xpos[6] - self.initial_effector_position  # Transform coordinates to relative to the initial position
         observation = np.concatenate([self.data.qpos, self.data.qvel])
-        return {"observation": observation,
-                "achieved_goal": achieved_goal,
-                "desired_goal": self.goal}
-        # return {
-        #     "observation": observation,
-        #     "achieved_goal": achieved_goal,
-        #     "desired_goal": self.goal
-        # }
+        return {"observation": observation, "achieved_goal": achieved_goal, "desired_goal": self.goal}
 
-    # def compute_reward(self, achieved_goal, desired_goal, info):
-    #     distance = np.linalg.norm(achieved_goal - desired_goal)
-    #     return -distance
     def compute_reward(self, data, target_position, info=None):
-        end_effector_position = self.data.xpos[6]
+        end_effector_position = self.data.xpos[6] - self.initial_effector_position  # Transform coordinates to relative to the initial position
         distance_to_target = np.linalg.norm(end_effector_position - target_position)
         if len(self.all_distances) > 0:
             last_distance_to_target = self.all_distances[-1]
@@ -106,8 +87,6 @@ class MujocoEnvWithGoals(gym.Env):
             last_distance_to_target = distance_to_target
         self.all_distances.append(distance_to_target)
         return last_distance_to_target - distance_to_target
-        # print(distance_to_target)
-        # return -distance_to_target
 
 # ---------------- Configuración y Entrenamiento ----------------
 xml_path = "franka_fr3_dual/scene.xml"
