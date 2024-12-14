@@ -22,7 +22,7 @@ cam.distance = 4
 cam.lookat = np.array([0.0, 0.0, 1])
 
 
-# Clase de entorno ya definida anteriormente
+# copia de una clase ya definida en otro archivo
 class MujocoEnvWithGoals(gym.Env):
     def __init__(self, model, data, goal, max_steps=1000):
         super(MujocoEnvWithGoals, self).__init__()

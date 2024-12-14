@@ -71,7 +71,7 @@ class ActorNetwork(nn.Module):
         self.fc1 = nn.Linear(state_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, action_dim)
-        self.log_std = nn.Linear(hidden_dim, action_dim)  # Si el actor tiene log_std (común en SAC)
+        self.log_std = nn.Linear(hidden_dim, action_dim) # logaritmo de la desviación estándar, modelo de política o distribución de acciones
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
@@ -81,7 +81,7 @@ class ActorNetwork(nn.Module):
         std = torch.exp(log_std)       # Convertir log_std a std
         return mean, std
 
-# Dimensiones de estado y acción (ajustar según el entorno)
+# Dimensiones de estado y acción
 state_dim = model.nq + model.nv + 3 # Número de posiciones y velocidades
 action_dim = model.nu  # Número de controles
 print(action_dim)
@@ -107,7 +107,7 @@ target_positions = [
     np.array([-0.5, -0.5, 0.2]),
     np.array([0.0, 0.5, 0.5]),
     np.array([0.5, 0.0, 0.3])
-]  # Puedes añadir más objetivos según sea necesario
+]
 success_threshold = 0.05
 
 
@@ -133,7 +133,7 @@ def main():
     cumulative_reward = 0
     for target_position in target_positions:
         print(f"Intentando alcanzar el objetivo: {target_position}")
-        steps_to_reach = 0  # Contador para el número de pasos por objetivo
+        steps_to_reach = 0  # número de pasos por objetivo
         all_distances = []
         while True:
             if glfw.window_should_close(window):
@@ -159,7 +159,6 @@ def main():
             cumulative_reward += reward
             steps_to_reach += 1
 
-            #print(data.xpos[6])
             print(target_position, data.xpos[6], reward)
 
             if np.linalg.norm(data.xpos[6] - target_position) < success_threshold:

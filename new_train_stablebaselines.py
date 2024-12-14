@@ -1,6 +1,6 @@
 import numpy as np
 import mujoco
-import gymnasium as gym  # Cambiado a Gymnasium
+import gymnasium as gym  # Gymnasium herramientas de entrenamiento de openAI
 from stable_baselines3 import SAC, HerReplayBuffer
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.env_checker import check_env

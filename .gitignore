@@ -1,3 +1,4 @@
 ignorar/
 franka_fr3_dual/
 img/
+__pycache__/

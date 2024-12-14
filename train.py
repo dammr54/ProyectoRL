@@ -29,7 +29,8 @@ class Actor(nn.Module):
         if not isinstance(goal, torch.Tensor):
             goal = torch.tensor(goal, dtype=torch.float32).to(next(self.parameters()).device)
 
-        # Asegurarse de que state y goal tengan una dimensión batch
+        # Asegurarse dimensión batch
+        # dimensión que agrupa varios ejemplos para procesarlos como un lote.
         if state.dim() == 1:
             state = state.unsqueeze(0)  # Agregar dimensión batch
         if goal.dim() == 1:
@@ -47,7 +48,7 @@ class Actor(nn.Module):
     def sample(self, state, goal):
         mean, std = self.forward(state, goal)
         normal = torch.distributions.Normal(mean, std)
-        z = normal.rsample()  # Reparameterization trick
+        z = normal.rsample()  # Reparameterization
         action = torch.tanh(z)
         log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + 1e-6)  # Log probabilidad con tanh
         return action, log_prob.sum(1, keepdim=True)
@@ -69,34 +70,32 @@ class Critic(nn.Module):
 # replay buffer her
 class HERReplayBuffer:
     def __init__(self, max_size, her_k=4):
-        """
-        Buffer con soporte para Hindsight Experience Replay.
-        Args:
-            max_size (int): Tamaño máximo del buffer.
-            her_k (int): Número de objetivos alternativos generados por transición.
-        """
         self.buffer = deque(maxlen=max_size)
         self.her_k = her_k  # Cuántas metas alternativas usar por transición.
 
     def add(self, transition):
-        """Agrega una transición al buffer."""
         self.buffer.append(transition)
 
-    def sample(self, batch_size):
-        """Toma muestras aleatorias y aplica HER."""
+    def sample(self, batch_size, data):
+        """
+        Muestra un batch del buffer y aplica HER con metas alternativas
+        basadas en `data.xpos[6]` (espacio independiente del estado).
+        """
         samples = random.sample(self.buffer, batch_size)
         augmented_samples = []
 
         for state, action, reward, next_state, done, goal in samples:
-            # Meta alternativa: usa el estado final como la nueva meta
-            her_goals = [next_state[:3] for _ in range(self.her_k)]  # Usa 3D posición del brazo como nueva meta
+            # Generar metas alternativas basadas en `data.xpos[6]`
+            her_goals = [data.xpos[6] for _ in range(self.her_k)]  # Usa la posición del efector final como nueva meta
             for new_goal in her_goals:
-                # Calcula nueva recompensa con la meta redefinida
-                new_reward = -np.linalg.norm(next_state[:3] - new_goal)  # Penalización por distancia
+                # Calcula la nueva recompensa basada en la meta alternativa
+                new_reward = -np.linalg.norm(np.array(new_goal) - np.array(goal))  # Penalización por distancia a la nueva meta
                 augmented_samples.append((state, action, new_reward, next_state, done, new_goal))
 
-        # Devuelve las muestras originales + muestras augmentadas
+        # Agregar las muestras originales
         augmented_samples.extend(samples)
+
+        # Convertir a tensores
         states, actions, rewards, next_states, dones, goals = zip(*augmented_samples)
         return (torch.tensor(states, dtype=torch.float32),
                 torch.tensor(actions, dtype=torch.float32),
@@ -158,7 +157,7 @@ class SAC:
         return action.cpu().detach().numpy().flatten()
 
     def train(self, batch_size=256):
-        states, actions, rewards, next_states, dones, goals = self.replay_buffer.sample(batch_size)
+        states, actions, rewards, next_states, dones, goals = self.replay_buffer.sample(batch_size, data)
 
         states, actions, rewards, next_states, dones, goals = (
             states.to(device), actions.to(device), rewards.to(device),
@@ -419,7 +418,7 @@ for episode in range(num_episodes):
         next_state = get_state(data)
         reward, distance_to_target = calculate_reward(data, goal, all_distances)
         all_distances.append(distance_to_target)
-        print(goal, distance_to_target, step, reward)
+        #print(goal, distance_to_target, step, reward)
 
         # Verifica si se alcanzó el objetivo
         done = distance_to_target <= goal_tolerance

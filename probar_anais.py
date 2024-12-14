@@ -52,8 +52,8 @@ class ActorNetwork(nn.Module):
         return mean, std
 
 # Dimensiones de estado y acción
-state_dim = 34
-action_dim = 8
+state_dim = model.nq + model.nv + 3 # Número de posiciones y velocidades
+action_dim = model.nu  # Número de controles
 
 # Cargar modelo del actor
 actor = ActorNetwork(state_dim, action_dim)
