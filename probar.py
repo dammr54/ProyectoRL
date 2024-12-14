@@ -88,13 +88,13 @@ action_dim = 8  # Número de actuadores controlados
 actor = ActorNetwork(state_dim, action_dim)
 #model_path = "modelos_entrenados/sac_checkpoint_100.pth"
 #model_path = "sac_checkpoint_1600.pth"
-#model_path = "ANAIS_sac_checkpoint_100.pth"
-model_path = "policy.pth"
+model_path = "ANAIS_sac_checkpoint_100.pth"
+#model_path = "policy.pth"
 checkpoint = torch.load(model_path)
-checkpoint = dict(checkpoint)
-print("checkpoint", checkpoint)
+#checkpoint = dict(checkpoint)
+#print("checkpoint", checkpoint)
 #print("checkpoint[\"actor\"]", checkpoint["actor"])
-actor.load_state_dict(checkpoint)
+actor.load_state_dict(checkpoint["actor"])
 #actor.load_state_dict(checkpoint["actor.latent_pi.0.weight"])
 actor.eval()  # Modo evaluación
 print("Modelo Actor cargado correctamente.")
