@@ -115,7 +115,7 @@ model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 # Entrenamiento del modelo
 num_episodes = 1000
-max_steps = 10000
+max_steps = 100000
 # max_steps = 1000
 
 goal = np.array([0.7, -0.5, 0.5])
