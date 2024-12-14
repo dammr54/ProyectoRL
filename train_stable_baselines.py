@@ -82,7 +82,8 @@ class MujocoEnvWithGoals(gym.Env):
     
         # Reward is positive if the distance to the target decreases (moves closer)
         # Negative if the distance increases (moves away)
-        reward = distance_change
+        # reward = distance_change
+        reward = 0.9 * distance_change + 0.1 * last_distance_to_target
     
         self.all_distances.append(distance_to_target)
     
@@ -121,7 +122,7 @@ model = SAC(
         copy_info_dict=False  # No copiar info para computar recompensas
     ),
     verbose=1,
-    gamma=0.95,
+    gamma=1,
     learning_rate=1e-4
 )
 
