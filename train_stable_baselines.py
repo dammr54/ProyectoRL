@@ -4,18 +4,6 @@ import numpy as np
 import mujoco
 from gymnasium import spaces
 from stable_baselines3 import SAC, HerReplayBuffer
-# from stable_baselines3.common.buffers import HerReplayBuffer
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
-from funciones_pickle import dump
-
-# ---------------- Adaptar entorno a Gym ----------------
-# import gym
-import gymnasium as gym
-import numpy as np
-import mujoco
-from gymnasium import spaces
-from stable_baselines3 import SAC, HerReplayBuffer
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.her.goal_selection_strategy import GoalSelectionStrategy
 from funciones_pickle import dump
@@ -133,6 +121,8 @@ model = SAC(
         copy_info_dict=False  # No copiar info para computar recompensas
     ),
     verbose=1,
+    gamma=0.95,
+    learning_rate=1e-4
 )
 
 try:
