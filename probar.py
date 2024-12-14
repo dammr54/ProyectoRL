@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 # --- Configuración del entorno MuJoCo ---
-#xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML}
-xml_path = "franka_fr3_dual/scene.xml"
+xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML}
+#xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 cam = mujoco.MjvCamera()
@@ -90,7 +90,7 @@ print(action_dim)
 actor = ActorNetwork(state_dim, action_dim)
 #model_path = "modelos_entrenados/sac_checkpoint_100.pth"
 #model_path = "sac_checkpoint_1600.pth"
-model_path = "ANAIS_sac_checkpoint_2.pth"
+model_path = "ANAIS_sac_checkpoint_10.pth"
 #model_path = "policy.pth"
 checkpoint = torch.load(model_path)
 #checkpoint = dict(checkpoint)
@@ -111,10 +111,19 @@ target_positions = [
 success_threshold = 0.05
 
 
-def calculate_reward(data, target_position):
-    current_position = data.qpos[6]  # Posición actual del actuador
-    distance = np.linalg.norm(current_position - target_position)
-    return -distance
+def calculate_reward(data, target_position, all_distances):
+    end_effector_position = data.xpos[6]
+    distance_to_target = np.linalg.norm(end_effector_position - target_position)
+    if len(all_distances) > 0:
+        last_distance_to_target = all_distances[-1]
+    else:
+        last_distance_to_target = distance_to_target
+    #all_distances.append(distance_to_target)
+    distance_change = last_distance_to_target - distance_to_target
+    reward = distance_change
+    #print(f"distance: {distance_to_target}")
+    #print(f"reward: {reward}")
+    return reward, distance_to_target
 
 # --- Bucle de simulación ---
 def main():
@@ -125,7 +134,7 @@ def main():
     for target_position in target_positions:
         print(f"Intentando alcanzar el objetivo: {target_position}")
         steps_to_reach = 0  # Contador para el número de pasos por objetivo
-
+        all_distances = []
         while True:
             if glfw.window_should_close(window):
                 glfw.terminate()
@@ -145,11 +154,13 @@ def main():
             mujoco.mj_step(model, data)
 
             # Calcular recompensa y verificar si el objetivo se alcanzó
-            reward = calculate_reward(data, target_position)
+            reward, distance_to_target = calculate_reward(data, target_position, all_distances)
+            all_distances.append(distance_to_target)
             cumulative_reward += reward
             steps_to_reach += 1
 
-            print(data.xpos[6])
+            #print(data.xpos[6])
+            print(target_position, data.xpos[6], reward)
 
             if np.linalg.norm(data.xpos[6] - target_position) < success_threshold:
                 print(f"Objetivo {target_position} alcanzado en {steps_to_reach} pasos.")

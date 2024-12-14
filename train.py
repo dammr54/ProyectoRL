@@ -300,7 +300,8 @@ def generate_random_goal(base_position=[0, 0, 0], radius=1):
 
 
 # Ruta al modelo XML
-xml_path = "franka_emika_panda/scene.xml"
+#xml_path = "franka_emika_panda/scene.xml"
+xml_path = "franka_fr3_dual/scene.xml"
 
 # Carga el modelo de MuJoCo
 model = mujoco.MjModel.from_xml_path(xml_path)
@@ -316,28 +317,96 @@ max_action = 1.0  # Acciones normalizadas [-1, 1]
 sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 3000
-max_steps = 200  # Máximo de pasos por episodio
+max_steps = 50000  # Máximo de pasos por episodio
 #oal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico]
 
 goal_tolerance = 0.40
 base_goal_position = np.array([0, 0, 0])  # Posición base para los objetivos
 goal_radius = 1  # Radio máximo para los objetivos aleatorios
 
+#for episode in range(num_episodes):
+#    mujoco.mj_resetData(model, data)  # Reinicia la simulación
+#    state = get_state(data)
+#    episode_reward = 0
+#    mean_d = []
+#    median_d = []
+#    min_d = []
+#    #tolerance_final = []
+#    all_rewards = []
+#    all_distances = []
+#
+#    goal = generate_random_goal(base_goal_position)
+#
+#    step = 0
+#    while True:  # Repetir indefinidamente hasta que se cumpla la condición
+#        # Selecciona una acción
+#        action = sac.select_action(state, goal)
+#
+#        # Aplica la acción y avanza la simulación
+#        apply_action(data, action)
+#        step_simulation(model, data)
+#
+#        # Extrae el nuevo estado, recompensa, y chequea si el episodio termina
+#        next_state = get_state(data)
+#        reward, distance_to_target = calculate_reward(data, goal, all_distances)
+#        all_distances.append(distance_to_target)
+#        print(goal, distance_to_target, step, reward, episode)
+#        
+#        # Verifica si se alcanzó el objetivo
+#        done = distance_to_target <= goal_tolerance
+#
+#        # Agrega la transición al buffer
+#        sac.add_to_buffer((state, action, reward, next_state, done, goal))
+#
+#        # Actualiza el estado
+#        state = next_state
+#        episode_reward += reward
+#
+#        # Entrena el modelo si hay suficientes datos
+#        if len(sac.replay_buffer.buffer) > 256:
+#            sac.train(batch_size=256)
+#
+#        if done or step >= 10000:
+#            break  # Termina el bucle si se alcanza el objetivo
+#
+#        step += 1
+#
+#    # Registro del episodio
+#    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
+#
+#    min_distance = min(all_distances)
+#    all_rewards.append(episode_reward)
+#    min_d.append(min_distance)
+#    mean_d.append(np.mean(all_distances))
+#    median_d.append(np.median(all_distances))
+#
+#    # Guarda el modelo cada 50 episodios
+#    if (episode + 1) % 5 == 0:
+#        torch.save({
+#        "actor": sac.actor.state_dict(),
+#        "critic1": sac.critic1.state_dict(),
+#        "critic2": sac.critic2.state_dict(),
+#        "actor_optimizer": sac.actor_optimizer.state_dict(),
+#        "critic1_optimizer": sac.critic1_optimizer.state_dict(),
+#        "critic2_optimizer": sac.critic2_optimizer.state_dict(),
+#        }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
+#        fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
+#        fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
+#        fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
+#        fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
+
+
+
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)  # Reinicia la simulación
     state = get_state(data)
     episode_reward = 0
-    mean_d = []
-    median_d = []
-    min_d = []
-    #tolerance_final = []
     all_rewards = []
     all_distances = []
-
-    goal = generate_random_goal(base_goal_position)
-
+    goal = generate_random_goal(base_goal_position, goal_radius)
     step = 0
-    while True:  # Repetir indefinidamente hasta que se cumpla la condición
+
+    while step < max_steps:  # Detener cuando se alcance el máximo de pasos
         # Selecciona una acción
         action = sac.select_action(state, goal)
 
@@ -349,8 +418,8 @@ for episode in range(num_episodes):
         next_state = get_state(data)
         reward, distance_to_target = calculate_reward(data, goal, all_distances)
         all_distances.append(distance_to_target)
-        print(goal, distance_to_target, step, reward, episode)
-        
+        print(goal, distance_to_target, step, reward)
+
         # Verifica si se alcanzó el objetivo
         done = distance_to_target <= goal_tolerance
 
@@ -361,35 +430,30 @@ for episode in range(num_episodes):
         state = next_state
         episode_reward += reward
 
-        # Entrena el modelo si hay suficientes datos
+        # Incrementa los contadores
+        step += 1
+
+        # Entrenar el modelo si hay suficientes datos
         if len(sac.replay_buffer.buffer) > 256:
             sac.train(batch_size=256)
 
-        if done or step >= 10000:
+        # Guarda automáticamente cada 5000 pasos
+        if step % 1000 == 0:
+            print(f"Guardando en el paso global {step}")
+            torch.save({
+                "actor": sac.actor.state_dict(),
+                "critic1": sac.critic1.state_dict(),
+                "critic2": sac.critic2.state_dict(),
+                "actor_optimizer": sac.actor_optimizer.state_dict(),
+                "critic1_optimizer": sac.critic1_optimizer.state_dict(),
+                "critic2_optimizer": sac.critic2_optimizer.state_dict(),
+            }, f"ANAIS_sac_checkpoint_step_{step}.pth")
+            fpickle.dump(f"listas_resultados/all_rewards_step_{step}.pickle", all_rewards)
+            fpickle.dump(f"listas_resultados/all_distances_step_{step}.pickle", all_distances)
+
+        if done:
             break  # Termina el bucle si se alcanza el objetivo
-
-        step += 1
-
-    # Registro del episodio
-    print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
-
-    min_distance = min(all_distances)
-    all_rewards.append(episode_reward)
-    min_d.append(min_distance)
-    mean_d.append(np.mean(all_distances))
-    median_d.append(np.median(all_distances))
-
-    # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 5 == 0:
-        torch.save({
-        "actor": sac.actor.state_dict(),
-        "critic1": sac.critic1.state_dict(),
-        "critic2": sac.critic2.state_dict(),
-        "actor_optimizer": sac.actor_optimizer.state_dict(),
-        "critic1_optimizer": sac.critic1_optimizer.state_dict(),
-        "critic2_optimizer": sac.critic2_optimizer.state_dict(),
-        }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
-        fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
-        fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
-        fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
-        fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
+    
+    if step >= max_steps:
+        print(f"Se alcanzaron los {max_steps} pasos. Deteniendo el entrenamiento.")
+        break

@@ -200,10 +200,8 @@ tolerance_final = []
 all_rewards = []
 all_distances = []
 
-<<<<<<< HEAD
 tolerance = 0.4
-=======
->>>>>>> cf7e20c5aca3bc20a527139c33eba0408f6023ae
+
 for episode in tqdm(range(num_episodes)):
     mujoco.mj_resetData(model, data)
     state = get_state(data)
@@ -274,8 +272,6 @@ for episode in tqdm(range(num_episodes)):
             fpickle.dump(f"listas_resultados/median_distance_{step}.pickle", median_d)
     # print(f"    Tolerancia final: {tolerance:.2f}")
     # tolerance_final.append(tolerance)
-<<<<<<< HEAD
-=======
 
     # Guarda el modelo cada 50 episodios
     # if (episode + 1) % 5 == 0:
@@ -292,7 +288,7 @@ for episode in tqdm(range(num_episodes)):
     #     fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
     #     fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
     #     fpickle.dump(f"listas_resultados/tolerances_{episode + 1}.pickle", tolerance_final)
->>>>>>> cf7e20c5aca3bc20a527139c33eba0408f6023ae
+
 
     # Guarda el modelo cada 50 episodios
     # if (episode + 1) % 5 == 0:
