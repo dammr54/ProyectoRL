@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 
 # --- Configuración del entorno MuJoCo ---
-xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML
+#xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML}
+xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 cam = mujoco.MjvCamera()
@@ -81,14 +82,15 @@ class ActorNetwork(nn.Module):
         return mean, std
 
 # Dimensiones de estado y acción (ajustar según el entorno)
-state_dim = 34  # Ejemplo: concatenación de qpos y qvel
-action_dim = 8  # Número de actuadores controlados
+state_dim = model.nq + model.nv + 3 # Número de posiciones y velocidades
+action_dim = model.nu  # Número de controles
+print(action_dim)
 
 # Crear y cargar el modelo del actor
 actor = ActorNetwork(state_dim, action_dim)
 #model_path = "modelos_entrenados/sac_checkpoint_100.pth"
 #model_path = "sac_checkpoint_1600.pth"
-model_path = "ANAIS_sac_checkpoint_100.pth"
+model_path = "ANAIS_sac_checkpoint_2.pth"
 #model_path = "policy.pth"
 checkpoint = torch.load(model_path)
 #checkpoint = dict(checkpoint)

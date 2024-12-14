@@ -5,6 +5,7 @@ from collections import deque
 import random
 import mujoco
 import numpy as np
+import funciones_pickle as fpickle
 
 #print(torch.__version__)
 #print(torch.cuda.is_available())
@@ -222,51 +223,80 @@ def apply_action(data, action):
     scaled_action = ctrl_min + (action + 1) * 0.5 * (ctrl_max - ctrl_min)  # Escala [-1, 1] al rango [ctrl_min, ctrl_max]
     data.ctrl[:] = scaled_action
 
+#
+#def calculate_reward(data, target_position, target_orientation=None, tolerance=0.1):
+#    """
+#    Calcula la recompensa para el brazo robótico basado en la distancia al objetivo,
+#    orientación deseada y esfuerzo aplicado.
+#
+#    Args:
+#        data (mujoco.MjData): Datos dinámicos de MuJoCo.
+#        target_position (np.array): Coordenadas 3D de la posición objetivo (x, y, z).
+#        target_orientation (np.array, optional): Orientación objetivo (cuaternión o matriz de rotación).
+#        tolerance (float): Distancia tolerada para considerar que el objetivo fue alcanzado.
+#
+#    Returns:
+#        float: Valor de la recompensa.
+#    """
+#    end_effector_id = 6
+#
+#    # Obtener la posición actual del end-effector
+#    end_effector_position = data.xpos[end_effector_id]
+#
+#    print(end_effector_position)
+#
+#    # Calcular distancia al objetivo
+#    distance_to_target = np.linalg.norm(end_effector_position - target_position)
+#
+#    # Penalización por distancia al objetivo
+#    reward = -distance_to_target*100
+#
+#    # Bonificación por éxito si está dentro de la tolerancia
+#    if distance_to_target < tolerance:
+#        reward += 100.0  # Bonificación fija por alcanzar el objetivo
+#
+#    # Penalización opcional por desalineación de orientación
+#    if target_orientation is not None:
+#        # Orientación actual del end-effector (cuaternión)
+#        current_orientation = data.xquat[end_effector_id]
+#        # Diferencia de orientación (puedes ajustar según la métrica que desees usar)
+#        orientation_diff = np.linalg.norm(current_orientation - target_orientation)
+#        reward -= 0.1 * orientation_diff  # Penalización leve por desalineación
+#
+#    # Penalización por esfuerzo aplicado
+#    #control_effort = np.sum(np.square(data.ctrl))  # Esfuerzo total en los actuadores
+#    #reward -= 0.01 * control_effort
+#
+#    return reward
 
-def calculate_reward(data, target_position, target_orientation=None, tolerance=0.1):
-    """
-    Calcula la recompensa para el brazo robótico basado en la distancia al objetivo,
-    orientación deseada y esfuerzo aplicado.
-
-    Args:
-        data (mujoco.MjData): Datos dinámicos de MuJoCo.
-        target_position (np.array): Coordenadas 3D de la posición objetivo (x, y, z).
-        target_orientation (np.array, optional): Orientación objetivo (cuaternión o matriz de rotación).
-        tolerance (float): Distancia tolerada para considerar que el objetivo fue alcanzado.
-
-    Returns:
-        float: Valor de la recompensa.
-    """
-    end_effector_id = 6
-
-    # Obtener la posición actual del end-effector
-    end_effector_position = data.xpos[end_effector_id]
-
-    print(end_effector_position)
-
-    # Calcular distancia al objetivo
+def calculate_reward(data, target_position, all_distances):
+    end_effector_position = data.xpos[6]
     distance_to_target = np.linalg.norm(end_effector_position - target_position)
+    if len(all_distances) > 0:
+        last_distance_to_target = all_distances[-1]
+    else:
+        last_distance_to_target = distance_to_target
+    #all_distances.append(distance_to_target)
+    distance_change = last_distance_to_target - distance_to_target
+    reward = distance_change
+    #print(f"distance: {distance_to_target}")
+    #print(f"reward: {reward}")
+    return reward, distance_to_target
 
-    # Penalización por distancia al objetivo
-    reward = -distance_to_target*100
-
-    # Bonificación por éxito si está dentro de la tolerancia
-    if distance_to_target < tolerance:
-        reward += 100.0  # Bonificación fija por alcanzar el objetivo
-
-    # Penalización opcional por desalineación de orientación
-    if target_orientation is not None:
-        # Orientación actual del end-effector (cuaternión)
-        current_orientation = data.xquat[end_effector_id]
-        # Diferencia de orientación (puedes ajustar según la métrica que desees usar)
-        orientation_diff = np.linalg.norm(current_orientation - target_orientation)
-        reward -= 0.1 * orientation_diff  # Penalización leve por desalineación
-
-    # Penalización por esfuerzo aplicado
-    #control_effort = np.sum(np.square(data.ctrl))  # Esfuerzo total en los actuadores
-    #reward -= 0.01 * control_effort
-
-    return reward
+def generate_random_goal(base_position=[0, 0, 0], radius=1):
+    """
+    Genera un objetivo aleatorio dentro de un radio especificado alrededor de una posición base.
+    Args:
+        base_position (np.array): Posición base [x, y, z].
+        radius (float): Radio máximo para el objetivo.
+    Returns:
+        np.array: Posición objetivo aleatoria [x, y, z].
+    """
+    while True:
+        random_offset = np.random.uniform(-radius, radius, size=3)
+        random_goal = base_position + random_offset
+        if np.linalg.norm(random_offset) <= radius:
+            return random_goal
 
 
 # Ruta al modelo XML
@@ -287,14 +317,27 @@ sac = SAC(state_dim, goal_dim, action_dim, max_action)
 
 num_episodes = 3000
 max_steps = 200  # Máximo de pasos por episodio
-goal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico
+#oal = np.array([0.7, 0, 0.5])  # Meta fija, cambiar si es dinámico]
+
+goal_tolerance = 0.40
+base_goal_position = np.array([0, 0, 0])  # Posición base para los objetivos
+goal_radius = 1  # Radio máximo para los objetivos aleatorios
 
 for episode in range(num_episodes):
     mujoco.mj_resetData(model, data)  # Reinicia la simulación
     state = get_state(data)
     episode_reward = 0
+    mean_d = []
+    median_d = []
+    min_d = []
+    #tolerance_final = []
+    all_rewards = []
+    all_distances = []
 
-    for step in range(max_steps):
+    goal = generate_random_goal(base_goal_position)
+
+    step = 0
+    while True:  # Repetir indefinidamente hasta que se cumpla la condición
         # Selecciona una acción
         action = sac.select_action(state, goal)
 
@@ -304,8 +347,12 @@ for episode in range(num_episodes):
 
         # Extrae el nuevo estado, recompensa, y chequea si el episodio termina
         next_state = get_state(data)
-        reward = calculate_reward(data, goal)
-        done = step == max_steps - 1  # Termina después de un número fijo de pasos
+        reward, distance_to_target = calculate_reward(data, goal, all_distances)
+        all_distances.append(distance_to_target)
+        print(goal, distance_to_target, step, reward, episode)
+        
+        # Verifica si se alcanzó el objetivo
+        done = distance_to_target <= goal_tolerance
 
         # Agrega la transición al buffer
         sac.add_to_buffer((state, action, reward, next_state, done, goal))
@@ -318,13 +365,22 @@ for episode in range(num_episodes):
         if len(sac.replay_buffer.buffer) > 256:
             sac.train(batch_size=256)
 
-        if done:
-            break
+        if done or step >= 10000:
+            break  # Termina el bucle si se alcanza el objetivo
 
+        step += 1
+
+    # Registro del episodio
     print(f"Episodio {episode + 1}, Recompensa Total: {episode_reward:.2f}")
 
+    min_distance = min(all_distances)
+    all_rewards.append(episode_reward)
+    min_d.append(min_distance)
+    mean_d.append(np.mean(all_distances))
+    median_d.append(np.median(all_distances))
+
     # Guarda el modelo cada 50 episodios
-    if (episode + 1) % 50 == 0:
+    if (episode + 1) % 5 == 0:
         torch.save({
         "actor": sac.actor.state_dict(),
         "critic1": sac.critic1.state_dict(),
@@ -332,4 +388,8 @@ for episode in range(num_episodes):
         "actor_optimizer": sac.actor_optimizer.state_dict(),
         "critic1_optimizer": sac.critic1_optimizer.state_dict(),
         "critic2_optimizer": sac.critic2_optimizer.state_dict(),
-    }, f"sac_checkpoint_{episode + 1}.pth")
+        }, f"ANAIS_sac_checkpoint_{episode + 1}.pth")
+        fpickle.dump(f"listas_resultados/all_rewards_{episode + 1}.pickle", all_rewards)
+        fpickle.dump(f"listas_resultados/min_distance_{episode + 1}.pickle", min_d)
+        fpickle.dump(f"listas_resultados/mean_distance_{episode + 1}.pickle", mean_d)
+        fpickle.dump(f"listas_resultados/median_distance_{episode + 1}.pickle", median_d)
