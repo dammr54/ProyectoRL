@@ -89,6 +89,8 @@ class MujocoEnvWithGoals(gym.Env):
         # Negative if the distance increases (moves away)
         # reward = distance_change
         reward = 0.9 * distance_change + 0.1 * last_distance_to_target
+        if reward < 0:
+            print(f"neg reward")
     
         self.all_distances.append(distance_to_target)
     
