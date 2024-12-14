@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 # --- Configuración del entorno MuJoCo ---
-xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML}
-#xml_path = "franka_fr3_dual/scene.xml"
+#xml_path = "franka_emika_panda/scene.xml"  # Ruta del archivo XML}
+xml_path = "franka_fr3_dual/scene.xml"
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
 cam = mujoco.MjvCamera()
@@ -90,7 +90,7 @@ print(action_dim)
 actor = ActorNetwork(state_dim, action_dim)
 #model_path = "modelos_entrenados/sac_checkpoint_100.pth"
 #model_path = "sac_checkpoint_1600.pth"
-model_path = "ANAIS_sac_checkpoint_10.pth"
+model_path = "ANAIS_sac_checkpoint_step_50000.pth"
 #model_path = "policy.pth"
 checkpoint = torch.load(model_path)
 #checkpoint = dict(checkpoint)
@@ -103,7 +103,7 @@ print("Modelo Actor cargado correctamente.")
 
 # --- Configuración de simulación ---
 target_positions = [
-    np.array([-0.7, 0, 0.5]),
+    np.array([0.33630353, 0.29517433, 0.42377351]),
     np.array([-0.5, -0.5, 0.2]),
     np.array([0.0, 0.5, 0.5]),
     np.array([0.5, 0.0, 0.3])

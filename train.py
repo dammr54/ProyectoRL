@@ -6,6 +6,7 @@ import random
 import mujoco
 import numpy as np
 import funciones_pickle as fpickle
+from tqdm import tqdm
 
 #print(torch.__version__)
 #print(torch.cuda.is_available())
